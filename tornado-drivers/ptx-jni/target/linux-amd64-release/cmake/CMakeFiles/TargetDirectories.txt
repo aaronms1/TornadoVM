@@ -1,0 +1,3 @@
+/home/ax56/TornadoVM/tornado-drivers/ptx-jni/target/linux-amd64-release/cmake/CMakeFiles/tornado-ptx.dir
+/home/ax56/TornadoVM/tornado-drivers/ptx-jni/target/linux-amd64-release/cmake/CMakeFiles/edit_cache.dir
+/home/ax56/TornadoVM/tornado-drivers/ptx-jni/target/linux-amd64-release/cmake/CMakeFiles/rebuild_cache.dir

@@ -4,7 +4,7 @@
 # compile CXX with /usr/bin/c++
 CXX_DEFINES = -Dtornado_ptx_EXPORTS
 
-CXX_INCLUDES = -I/home/ax56/TornadoVM/tornado-drivers/ptx-jni/target/linux-amd64-release/sources/source -I/home/ax56/TornadoVM/etc/dependencies/TornadoVM-graalvm-jdk-17/graalvm-ce-java17-22.3.1/include -I/home/ax56/TornadoVM/etc/dependencies/TornadoVM-graalvm-jdk-17/graalvm-ce-java17-22.3.1/include/linux
+CXX_INCLUDES = -I/home/ax56/TornadoVM/tornado-drivers/ptx-jni/target/linux-amd64-release/sources/source -I/home/ax56/TornadoVM/etc/dependencies/TornadoVM-graalvm-jdk-17/graalvm-ce-java17-22.3.2/include -I/home/ax56/TornadoVM/etc/dependencies/TornadoVM-graalvm-jdk-17/graalvm-ce-java17-22.3.2/include/linux
 
-CXX_FLAGS =  -O3 -fpermissive -export-dynamic -fPIC  -O3 -DNDEBUG -fPIC
+CXX_FLAGS =  -O2 -fpermissive -export-dynamic -fPIC  -O3 -DNDEBUG -fPIC
 

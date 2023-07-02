@@ -31,6 +31,7 @@ uk/ac/manchester/tornado/drivers/ptx/graal/nodes/GlobalThreadIdNode.class
 uk/ac/manchester/tornado/drivers/ptx/graal/nodes/LocalThreadSizeNode.class
 uk/ac/manchester/tornado/drivers/ptx/graal/nodes/PrintfNode.class
 uk/ac/manchester/tornado/drivers/ptx/graal/phases/BoundCheckEliminationPhase.class
+uk/ac/manchester/tornado/drivers/ptx/graal/compiler/plugins/PTXMathPlugins$18.class
 uk/ac/manchester/tornado/drivers/ptx/mm/PTXByteArrayWrapper.class
 uk/ac/manchester/tornado/drivers/ptx/graal/PTXArchitecture$PTXBuiltInRegisterArray.class
 uk/ac/manchester/tornado/drivers/ptx/graal/nodes/calc/DivNode.class

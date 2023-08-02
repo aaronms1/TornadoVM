@@ -36,9 +36,9 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.function.Consumer;
-import java.util.stream.Collectors;
 
 import uk.ac.manchester.tornado.api.TornadoDeviceContext;
 import uk.ac.manchester.tornado.api.common.Access;
@@ -70,7 +70,7 @@ public class TornadoExecutionContext {
     private List<Object> objects;
     private List<LocalObjectState> objectState;
     private List<TornadoAcceleratorDevice> devices;
-    private int[] taskToDeviceMapTable;
+    private TornadoAcceleratorDevice[] taskToDeviceMapTable;
     private int nextTask;
 
     private long batchSize;
@@ -93,8 +93,8 @@ public class TornadoExecutionContext {
         objectState = new ArrayList<>();
         devices = new ArrayList<>(INITIAL_DEVICE_CAPACITY);
         callWrappers = new KernelArgs[MAX_TASKS];
-        taskToDeviceMapTable = new int[MAX_TASKS];
-        Arrays.fill(taskToDeviceMapTable, -1);
+        taskToDeviceMapTable = new TornadoAcceleratorDevice[MAX_TASKS];
+        Arrays.fill(taskToDeviceMapTable, null);
         nextTask = 0;
         batchSize = -1;
         lastDevices = new HashSet<>();
@@ -194,12 +194,8 @@ public class TornadoExecutionContext {
         return objects;
     }
 
-    public int getDeviceIndexForTask(int index) {
-        return taskToDeviceMapTable[index];
-    }
-
     public TornadoAcceleratorDevice getDeviceForTask(int index) {
-        return getDevice(taskToDeviceMapTable[index]);
+        return taskToDeviceMapTable[index];
     }
 
     public TornadoAcceleratorDevice getDevice(int index) {
@@ -229,23 +225,17 @@ public class TornadoExecutionContext {
             devices.clear();
             devices.add(0, (TornadoAcceleratorDevice) tornadoDevice);
             apply(task -> task.mapTo(tornadoDevice));
-            Arrays.fill(taskToDeviceMapTable, 0);
+            Arrays.fill(taskToDeviceMapTable, tornadoDevice);
         } else {
             throw new TornadoRuntimeException("Device " + tornadoDevice.getClass() + " not supported yet");
         }
     }
 
-    private void checkDeviceListSize(int deviceIndex) {
-        if (deviceIndex >= devices.size()) {
-            for (int i = devices.size(); i <= deviceIndex; i++) {
-                devices.add(null);
-            }
+    public void setDevice(TornadoAcceleratorDevice device) {
+        // If the device is not in the list of devices, add it
+        if (!devices.contains(device)) {
+            devices.add(device);
         }
-    }
-
-    public void setDevice(int index, TornadoAcceleratorDevice device) {
-        checkDeviceListSize(index);
-        devices.set(index, device);
     }
 
     /**
@@ -270,26 +260,11 @@ public class TornadoExecutionContext {
             throw new TornadoRuntimeException("Device " + target.getClass() + " not supported yet");
         }
 
-        int deviceIndex = devices.indexOf(target);
+        setDevice(accelerator);
+
         info("assigning %s to %s", id, target.getDeviceName());
 
-        if (deviceIndex == -1) {
-            deviceIndex = task.meta().getDeviceIndex();
-            setDevice(deviceIndex, accelerator);
-        }
-
-        taskToDeviceMapTable[index] = deviceIndex;
-    }
-
-    /**
-     * It sets all device entries in the device list to null except the specified
-     * device index.
-     *
-     * @param deviceIndex
-     *            The index of the device to exclude from nullification.
-     */
-    public void nullifyDevicesTableExceptAtIndex(int deviceIndex) {
-        devices = devices.stream().map(device -> devices.indexOf(device) == deviceIndex ? device : null).collect(Collectors.toList());
+        taskToDeviceMapTable[index] = accelerator;
     }
 
     public void scheduleTaskToDevices() {
@@ -317,7 +292,7 @@ public class TornadoExecutionContext {
         // [0]: null
         // [1]: null
         // [2]: [Intel(R) FPGA EmulationPlatform for OpenCL(TM)] -- Intel(R) FPGA
-        return (int) getDevices().stream().filter(device -> device != null).count();
+        return (int) getDevices().stream().filter(Objects::nonNull).count();
     }
 
     /**

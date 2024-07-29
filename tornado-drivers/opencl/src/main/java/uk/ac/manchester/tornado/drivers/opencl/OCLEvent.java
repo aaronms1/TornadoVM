@@ -1,5 +1,5 @@
 /*
- * This file is part of Tornado: A heterogeneous programming framework: 
+ * This file is part of Tornado: A heterogeneous programming framework:
  * https://github.com/beehive-lab/tornadovm
  *
  * Copyright (c) 2013-2021, APT Group, Department of Computer Science,
@@ -12,15 +12,13 @@
  *
  * This code is distributed in the hope that it will be useful, but WITHOUT
  * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
- * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License
  * version 2 for more details (a copy is included in the LICENSE file that
  * accompanied this code).
  *
  * You should have received a copy of the GNU General Public License version
  * 2 along with this work; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
- *
- * Authors: James Clarkson
  *
  */
 package uk.ac.manchester.tornado.drivers.opencl;
@@ -32,7 +30,7 @@ import static uk.ac.manchester.tornado.drivers.opencl.enums.OCLProfilingInfo.CL_
 import static uk.ac.manchester.tornado.drivers.opencl.enums.OCLProfilingInfo.CL_PROFILING_COMMAND_QUEUED;
 import static uk.ac.manchester.tornado.drivers.opencl.enums.OCLProfilingInfo.CL_PROFILING_COMMAND_START;
 import static uk.ac.manchester.tornado.drivers.opencl.enums.OCLProfilingInfo.CL_PROFILING_COMMAND_SUBMIT;
-import static uk.ac.manchester.tornado.runtime.common.Tornado.ENABLE_PROFILING;
+import static uk.ac.manchester.tornado.runtime.common.TornadoOptions.ENABLE_OPENCL_PROFILING;
 
 import java.nio.ByteBuffer;
 
@@ -54,12 +52,14 @@ public class OCLEvent implements Event {
     private final ByteBuffer buffer = ByteBuffer.allocate(8);
     private String name;
     private int status;
+    private TornadoLogger logger;
 
     OCLEvent() {
         buffer.order(OpenCL.BYTE_ORDER);
+        this.logger = new TornadoLogger(this.getClass());
     }
 
-    OCLEvent(String eventNameDescription, final OCLCommandQueue queue, final int event, final long oclEventID) {
+    public OCLEvent(String eventNameDescription, final OCLCommandQueue queue, final int event, final long oclEventID) {
         this();
         this.queue = queue;
         this.localId = event;
@@ -82,7 +82,7 @@ public class OCLEvent implements Event {
     native static void clReleaseEvent(long eventId) throws OCLException;
 
     private long readEventTime(OCLProfilingInfo eventType) {
-        if (!ENABLE_PROFILING) {
+        if (!ENABLE_OPENCL_PROFILING) {
             return -1;
         }
         long time = 0;
@@ -91,13 +91,13 @@ public class OCLEvent implements Event {
             clGetEventProfilingInfo(oclEventID, eventType.getValue(), buffer.array());
             time = buffer.getLong();
         } catch (OCLException e) {
-            TornadoLogger.error(e.getMessage());
+            logger.error(e.getMessage());
         }
         return time;
     }
 
     @Override
-    public void waitForEvents() {
+    public void waitForEvents(long executionPlanId) {
         try {
             clWaitForEvents(new long[] { oclEventID });
         } catch (OCLException e) {
@@ -132,7 +132,7 @@ public class OCLEvent implements Event {
             clGetEventInfo(oclEventID, CL_EVENT_COMMAND_EXECUTION_STATUS.getValue(), buffer.array());
             status = buffer.getInt();
         } catch (OCLException e) {
-            TornadoLogger.error(e.getMessage());
+            logger.error(e.getMessage());
         }
 
         return createOCLCommandExecutionStatus(status);
@@ -151,7 +151,7 @@ public class OCLEvent implements Event {
                 break;
             case CL_ERROR:
             case CL_UNKNOWN:
-                TornadoLogger.fatal("error on event: %s", name);
+                logger.fatal("error on event: %s", name);
         }
     }
 
@@ -161,7 +161,7 @@ public class OCLEvent implements Event {
             internalBuffer[1] = oclEventID;
             clWaitForEvents(internalBuffer);
         } catch (OCLException e) {
-            TornadoLogger.error(e.getMessage());
+            logger.error(e.getMessage());
         }
     }
 
@@ -228,7 +228,7 @@ public class OCLEvent implements Event {
         try {
             clReleaseEvent(oclEventID);
         } catch (OCLException e) {
-            TornadoLogger.error(e.getMessage());
+            logger.error(e.getMessage());
         }
     }
 }

@@ -1,5 +1,5 @@
 /*
- * This file is part of Tornado: A heterogeneous programming framework: 
+ * This file is part of Tornado: A heterogeneous programming framework:
  * https://github.com/beehive-lab/tornadovm
  *
  * Copyright (c) 2013-2020, 2023 APT Group, Department of Computer Science,
@@ -12,19 +12,17 @@
  *
  * This code is distributed in the hope that it will be useful, but WITHOUT
  * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
- * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License
  * version 2 for more details (a copy is included in the LICENSE file that
  * accompanied this code).
  *
  * You should have received a copy of the GNU General Public License version
  * 2 along with this work; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
- *
- *
  */
 package uk.ac.manchester.tornado.runtime.graph.nodes;
 
-import uk.ac.manchester.tornado.runtime.common.TornadoAcceleratorDevice;
+import uk.ac.manchester.tornado.runtime.common.TornadoXPUDevice;
 
 /**
  * It represents a context node used in a
@@ -33,19 +31,19 @@ import uk.ac.manchester.tornado.runtime.common.TornadoAcceleratorDevice;
 public class ContextNode extends AbstractNode {
 
     private int deviceIndex;
-    private TornadoAcceleratorDevice device;
+    private TornadoXPUDevice device;
 
     /**
      * It constructs a ContextNode with the given device index and
-     * {@link TornadoAcceleratorDevice}.
+     * {@link TornadoXPUDevice}.
      *
      * @param index
-     *            The index of the device.
+     *     The index of the device.
      * @param device
-     *            The {@link TornadoAcceleratorDevice} associated with this context
-     *            node.
+     *     The {@link TornadoXPUDevice} associated with this context
+     *     node.
      */
-    public ContextNode(int index, TornadoAcceleratorDevice device) {
+    public ContextNode(int index, TornadoXPUDevice device) {
         this.deviceIndex = index;
         this.device = device;
     }
@@ -72,30 +70,30 @@ public class ContextNode extends AbstractNode {
      * It sets the device index associated with this context node.
      *
      * @param deviceIndex
-     *            The device index to set.
+     *     The device index to set.
      */
     public void setDeviceIndex(int deviceIndex) {
         this.deviceIndex = deviceIndex;
     }
 
     /**
-     * It gets the {@link TornadoAcceleratorDevice} associated with this context
+     * It gets the {@link TornadoXPUDevice} associated with this context
      * node.
      *
-     * @return The TornadoAcceleratorDevice.
+     * @return {@link TornadoXPUDevice}
      */
-    public TornadoAcceleratorDevice getDevice() {
+    public TornadoXPUDevice getDevice() {
         return this.device;
     }
 
     /**
-     * It sets the {@link TornadoAcceleratorDevice} associated with this context
+     * It sets the {@link TornadoXPUDevice} associated with this context
      * node.
      *
      * @param device
-     *            The {@link TornadoAcceleratorDevice} to set.
+     *     The {@link TornadoXPUDevice} to set.
      */
-    public void setDevice(TornadoAcceleratorDevice device) {
+    public void setDevice(TornadoXPUDevice device) {
         this.device = device;
     }
 

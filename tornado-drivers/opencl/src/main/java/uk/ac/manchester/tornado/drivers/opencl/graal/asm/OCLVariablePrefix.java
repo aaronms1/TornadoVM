@@ -2,7 +2,7 @@
  * This file is part of Tornado: A heterogeneous programming framework:
  * https://github.com/beehive-lab/tornadovm
  *
- * Copyright (c) 2023, APT Group, Department of Computer Science,
+ * Copyright (c) 2023, 2024, APT Group, Department of Computer Science,
  * The University of Manchester. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
@@ -12,15 +12,13 @@
  *
  * This code is distributed in the hope that it will be useful, but WITHOUT
  * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
- * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License
  * version 2 for more details (a copy is included in the LICENSE file that
  * accompanied this code).
  *
  * You should have received a copy of the GNU General Public License version
  * 2 along with this work; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
- *
- *
  */
 package uk.ac.manchester.tornado.drivers.opencl.graal.asm;
 
@@ -69,7 +67,13 @@ public enum OCLVariablePrefix {
     BYTE16("byte16", "b16_"),
     SHORT("short", "sh_"),
     SHORT2("short2", "sh2_"),
-    SHORT3("short3", "sh3_");
+    SHORT3("short3", "sh3_"),
+    HALF("half", "half_"),
+    HALF2("half2", "v2hf_"),
+    HALF3("half3", "v3hf_"),
+    HALF4("half4", "v4hf_"),
+    HALF8("half8", "v8hf_"),
+    HALF16("half16", "v16hf_");
 
     // @formatter:on
 
@@ -80,9 +84,9 @@ public enum OCLVariablePrefix {
      * It constructs an OCLVariablePrefix enum with the specified type and prefix.
      *
      * @param type
-     *            The type string.
+     *     The type string.
      * @param prefix
-     *            The prefix string.
+     *     The prefix string.
      */
     OCLVariablePrefix(String type, String prefix) {
         this.type = type;

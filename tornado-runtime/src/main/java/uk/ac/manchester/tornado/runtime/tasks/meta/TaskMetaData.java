@@ -12,7 +12,7 @@
  *
  * This code is distributed in the hope that it will be useful, but WITHOUT
  * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
- * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License
  * version 2 for more details (a copy is included in the LICENSE file that
  * accompanied this code).
  *
@@ -20,13 +20,11 @@
  * 2 along with this work; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
  *
- * Authors: James Clarkson
- *
  */
 package uk.ac.manchester.tornado.runtime.tasks.meta;
 
 import static uk.ac.manchester.tornado.api.exceptions.TornadoInternalError.guarantee;
-import static uk.ac.manchester.tornado.runtime.common.Tornado.EVENT_WINDOW;
+import static uk.ac.manchester.tornado.runtime.common.TornadoOptions.EVENT_WINDOW;
 
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
@@ -41,26 +39,28 @@ import uk.ac.manchester.tornado.api.common.Access;
 import uk.ac.manchester.tornado.api.common.TornadoEvents;
 import uk.ac.manchester.tornado.api.enums.TornadoVMBackendType;
 import uk.ac.manchester.tornado.runtime.EventSet;
-import uk.ac.manchester.tornado.runtime.common.TornadoAcceleratorDevice;
+import uk.ac.manchester.tornado.runtime.common.TornadoXPUDevice;
 import uk.ac.manchester.tornado.runtime.domain.DomainTree;
 
 public class TaskMetaData extends AbstractMetaData {
 
-    protected final Map<TornadoAcceleratorDevice, BitSet> profiles;
+    public static final String LOCAL_WORKGROUP_SUFFIX = ".local.workgroup.size";
+    public static final String GLOBAL_WORKGROUP_SUFFIX = ".global.workgroup.size";
+    protected final Map<TornadoXPUDevice, BitSet> profiles;
     private final byte[] constantData;
     private final ScheduleMetaData scheduleMetaData;
+    private final int constantSize;
     protected Access[] argumentsAccess;
     protected DomainTree domain;
-    private int constantSize;
     private long[] globalOffset;
     private long[] globalWork;
-    private int localSize;
+    private final int localSize;
     private long[] localWork;
     private boolean localWorkDefined;
     private boolean globalWorkDefined;
 
     public TaskMetaData(ScheduleMetaData scheduleMetaData, String taskID, int numParameters) {
-        super(scheduleMetaData.getId() + "." + taskID, scheduleMetaData);
+        super(STR."\{scheduleMetaData.getId()}.\{taskID}", scheduleMetaData);
         this.scheduleMetaData = scheduleMetaData;
         this.constantSize = 0;
         this.localSize = 0;
@@ -81,7 +81,8 @@ public class TaskMetaData extends AbstractMetaData {
     }
 
     public static TaskMetaData create(ScheduleMetaData scheduleMeta, String id, Method method) {
-        return new TaskMetaData(scheduleMeta, id, Modifier.isStatic(method.getModifiers()) ? method.getParameterCount() : method.getParameterCount() + 1);
+        int numParameters = Modifier.isStatic(method.getModifiers()) ? method.getParameterCount() : method.getParameterCount() + 1;
+        return new TaskMetaData(scheduleMeta, id, numParameters);
     }
 
     private static String formatWorkDimensionArray(final long[] array, final String defaults) {
@@ -99,10 +100,10 @@ public class TaskMetaData extends AbstractMetaData {
     }
 
     private void inspectLocalWork() {
-        localWorkDefined = getProperty(getId() + ".local.dims") != null;
+        localWorkDefined = getProperty(getId() + LOCAL_WORKGROUP_SUFFIX) != null;
         if (localWorkDefined) {
-            final String[] values = getProperty(getId() + ".local.dims").split(",");
-            localWork = new long[] { 1, 1, 1 };
+            final String[] values = getProperty(getId() + LOCAL_WORKGROUP_SUFFIX).split(",");
+            localWork = new long[values.length];
             for (int i = 0; i < values.length; i++) {
                 localWork[i] = Long.parseLong(values[i]);
             }
@@ -110,9 +111,9 @@ public class TaskMetaData extends AbstractMetaData {
     }
 
     private void inspectGlobalWork() {
-        globalWorkDefined = getProperty(getId() + ".global.dims") != null;
+        globalWorkDefined = getProperty(getId() + GLOBAL_WORKGROUP_SUFFIX) != null;
         if (globalWorkDefined) {
-            final String[] values = getProperty(getId() + ".global.dims").split(",");
+            final String[] values = getProperty(getId() + GLOBAL_WORKGROUP_SUFFIX).split(",");
             globalWork = new long[values.length];
             for (int i = 0; i < values.length; i++) {
                 globalWork[i] = Long.parseLong(values[i]);
@@ -132,13 +133,17 @@ public class TaskMetaData extends AbstractMetaData {
         localWork = null;
     }
 
+    public void setLocalWorkToNotDefined() {
+        localWorkDefined = false;
+    }
+
     public long[] initLocalWork() {
         localWork = new long[] { 1, 1, 1 };
         return localWork;
     }
 
     public void addProfile(int id) {
-        final TornadoAcceleratorDevice device = getLogicDevice();
+        final TornadoXPUDevice device = getLogicDevice();
         BitSet events;
         profiles.computeIfAbsent(device, k -> new BitSet(EVENT_WINDOW));
         events = profiles.get(device);
@@ -146,38 +151,8 @@ public class TaskMetaData extends AbstractMetaData {
     }
 
     @Override
-    public boolean enableExceptions() {
-        return super.enableExceptions() || scheduleMetaData.enableExceptions();
-    }
-
-    @Override
-    public boolean enableMemChecks() {
-        return super.enableMemChecks() || scheduleMetaData.enableMemChecks();
-    }
-
-    @Override
-    public boolean enableOooExecution() {
-        return super.enableOooExecution() || scheduleMetaData.enableOooExecution();
-    }
-
-    @Override
-    public boolean enableOpenCLBifs() {
-        return super.enableOpenCLBifs() || scheduleMetaData.enableOpenCLBifs();
-    }
-
-    @Override
     public boolean enableParallelization() {
         return scheduleMetaData.isEnableParallelizationDefined() && !isEnableParallelizationDefined() ? scheduleMetaData.enableParallelization() : super.enableParallelization();
-    }
-
-    @Override
-    public boolean enableProfiling() {
-        return super.enableProfiling() || scheduleMetaData.enableProfiling();
-    }
-
-    @Override
-    public boolean enableVectors() {
-        return super.enableVectors() || scheduleMetaData.enableVectors();
     }
 
     @Override
@@ -204,7 +179,7 @@ public class TaskMetaData extends AbstractMetaData {
     }
 
     @Override
-    public TornadoAcceleratorDevice getLogicDevice() {
+    public TornadoXPUDevice getLogicDevice() {
         if (scheduleMetaData.isDeviceManuallySet() || (scheduleMetaData.isDeviceDefined() && !isDeviceDefined())) {
             return scheduleMetaData.getLogicDevice();
         }
@@ -297,10 +272,10 @@ public class TaskMetaData extends AbstractMetaData {
     }
 
     @Override
-    public List<TornadoEvents> getProfiles() {
+    public List<TornadoEvents> getProfiles(long executionPlanId) {
         final List<TornadoEvents> result = new ArrayList<>(profiles.keySet().size());
-        for (TornadoAcceleratorDevice device : profiles.keySet()) {
-            result.add(new EventSet(device, profiles.get(device)));
+        for (TornadoXPUDevice device : profiles.keySet()) {
+            result.add(new EventSet(device, profiles.get(device), executionPlanId));
         }
         return result;
     }
@@ -331,36 +306,31 @@ public class TaskMetaData extends AbstractMetaData {
     public void printThreadDims() {
         StringBuilder deviceDebug = new StringBuilder();
         boolean deviceBelongsToPTX = isPTXDevice(getLogicDevice());
-        deviceDebug.append("Task info: " + getId() + "\n");
-        deviceDebug.append("\tBackend           : " + getLogicDevice().getTornadoVMBackend().name() + "\n");
-        deviceDebug.append("\tDevice            : " + getLogicDevice().getDescription() + "\n");
-        deviceDebug.append("\tDims              : " + (this.isWorkerGridAvailable() ? getWorkerGrid(getId()).dimension() : (hasDomain() ? domain.getDepth() : 0)) + "\n");
+        deviceDebug.append(STR."Task info: \{getId()}\n");
+        deviceDebug.append(STR."\tBackend           : \{getLogicDevice().getTornadoVMBackend().name()}\n");
+        deviceDebug.append(STR."\tDevice            : \{getLogicDevice().getDescription()}\n");
+        deviceDebug.append(STR."\tDims              : \{this.isWorkerGridAvailable() ? getWorkerGrid(getId()).dimension() : (hasDomain() ? domain.getDepth() : 0)}\n");
         if (!deviceBelongsToPTX) {
             long[] go = this.isWorkerGridAvailable() ? getWorkerGrid(getId()).getGlobalOffset() : globalOffset;
-            deviceDebug.append("\tGlobal work offset: " + formatWorkDimensionArray(go, "0") + "\n");
+            deviceDebug.append(STR."\tGlobal work offset: \{formatWorkDimensionArray(go, "0")}\n");
         }
         long[] gw = this.isWorkerGridAvailable() ? getWorkerGrid(getId()).getGlobalWork() : globalWork;
         if (deviceBelongsToPTX) {
-            deviceDebug.append("\tThread dimensions : " + formatWorkDimensionArray(gw, "1") + "\n");
-            deviceDebug.append("\tBlocks dimensions : " + formatWorkDimensionArray(getPTXBlockDim(), "1") + "\n");
-            deviceDebug.append("\tGrids dimensions  : " + formatWorkDimensionArray(getPTXGridDim(), "1") + "\n");
+            deviceDebug.append(STR."\tThread dimensions : \{formatWorkDimensionArray(gw, "1")}\n");
+            deviceDebug.append(STR."\tBlocks dimensions : \{formatWorkDimensionArray(getPTXBlockDim(), "1")}\n");
+            deviceDebug.append(STR."\tGrids dimensions  : \{formatWorkDimensionArray(getPTXGridDim(), "1")}\n");
         } else {
             long[] lw = this.isWorkerGridAvailable() ? getWorkerGrid(getId()).getLocalWork() : localWork;
             long[] nw = this.isWorkerGridAvailable() ? getWorkerGrid(getId()).getNumberOfWorkgroups() : (hasDomain() ? calculateNumberOfWorkgroupsFromDomain(domain) : null);
-            deviceDebug.append("\tGlobal work size  : " + formatWorkDimensionArray(gw, "1") + "\n");
-            deviceDebug.append("\tLocal  work size  : " + (lw == null ? "null" : formatWorkDimensionArray(lw, "1")) + "\n");
-            deviceDebug.append("\tNumber of workgroups  : " + (nw == null ? "null" : formatWorkDimensionArray(nw, "1")) + "\n");
+            deviceDebug.append(STR."\tGlobal work size  : \{formatWorkDimensionArray(gw, "1")}\n");
+            deviceDebug.append(STR."\tLocal  work size  : \{lw == null ? "null" : formatWorkDimensionArray(lw, "1")}\n");
+            deviceDebug.append(STR."\tNumber of workgroups  : \{nw == null ? "null" : formatWorkDimensionArray(nw, "1")}\n");
         }
         System.out.println(deviceDebug);
     }
 
-    public boolean isPTXDevice(TornadoAcceleratorDevice device) {
+    public boolean isPTXDevice(TornadoXPUDevice device) {
         return device.getTornadoVMBackend().equals(TornadoVMBackendType.PTX);
-    }
-
-    @Override
-    public boolean shouldDebugKernelArgs() {
-        return super.shouldDebugKernelArgs() || scheduleMetaData.shouldDebugKernelArgs();
     }
 
     @Override
@@ -374,48 +344,13 @@ public class TaskMetaData extends AbstractMetaData {
     }
 
     @Override
-    public boolean shouldPrintCompileTimes() {
-        return super.shouldPrintCompileTimes() || scheduleMetaData.shouldPrintCompileTimes();
-    }
-
-    @Override
-    public boolean shouldPrintKernelExecutionTime() {
-        return super.shouldPrintKernelExecutionTime() || scheduleMetaData.shouldPrintKernelExecutionTime();
-    }
-
-    @Override
-    public boolean shouldUseOpenCLBlockingApiCalls() {
-        return super.shouldUseOpenCLBlockingApiCalls() || scheduleMetaData.shouldUseOpenCLBlockingApiCalls();
-    }
-
-    @Override
-    public boolean shouldUseOpenCLRelativeAddresses() {
-        return super.shouldUseOpenCLRelativeAddresses() || scheduleMetaData.shouldUseOpenCLRelativeAddresses();
-    }
-
-    @Override
     public boolean shouldUseOpenCLDriverScheduling() {
         return super.shouldUseOpenCLDriverScheduling() || scheduleMetaData.shouldUseOpenCLDriverScheduling();
     }
 
     @Override
-    public boolean shouldUseOpenCLWaitActive() {
-        return super.shouldUseOpenCLWaitActive() || scheduleMetaData.shouldUseOpenCLWaitActive();
-    }
-
-    @Override
-    public boolean shouldUseVmWaitEvent() {
-        return super.shouldUseVmWaitEvent() || scheduleMetaData.shouldUseVmWaitEvent();
-    }
-
-    @Override
     public boolean enableThreadCoarsener() {
         return super.enableThreadCoarsener() || scheduleMetaData.enableThreadCoarsener();
-    }
-
-    @Override
-    public boolean shouldCoarsenWithCpuConfig() {
-        return super.shouldCoarsenWithCpuConfig() || scheduleMetaData.shouldCoarsenWithCpuConfig();
     }
 
     @Override
@@ -425,6 +360,6 @@ public class TaskMetaData extends AbstractMetaData {
 
     @Override
     public String toString() {
-        return String.format("task meta data: domain=%s, global dims=%s%n", domain, (getGlobalWork() == null) ? "null" : formatWorkDimensionArray(getGlobalWork(), "1"));
+        return String.format("task meta data: domain=%s, global workgroup size=%s%n", domain, (getGlobalWork() == null) ? "null" : formatWorkDimensionArray(getGlobalWork(), "1"));
     }
 }

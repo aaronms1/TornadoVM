@@ -12,7 +12,7 @@
  *
  * This code is distributed in the hope that it will be useful, but WITHOUT
  * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
- * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License
  * version 2 for more details (a copy is included in the LICENSE file that
  * accompanied this code).
  *
@@ -23,11 +23,7 @@
  */
 package uk.ac.manchester.tornado.drivers.spirv.mm;
 
-import static uk.ac.manchester.tornado.api.exceptions.TornadoInternalError.shouldNotReachHere;
 import static uk.ac.manchester.tornado.runtime.common.RuntimeUtilities.humanReadableByteCount;
-import static uk.ac.manchester.tornado.runtime.common.Tornado.VALIDATE_ARRAY_HEADERS;
-import static uk.ac.manchester.tornado.runtime.common.Tornado.fatal;
-import static uk.ac.manchester.tornado.runtime.common.Tornado.info;
 
 import java.lang.reflect.Array;
 import java.util.ArrayList;
@@ -37,12 +33,13 @@ import jdk.vm.ci.meta.JavaKind;
 import uk.ac.manchester.tornado.api.exceptions.TornadoInternalError;
 import uk.ac.manchester.tornado.api.exceptions.TornadoMemoryException;
 import uk.ac.manchester.tornado.api.exceptions.TornadoRuntimeException;
-import uk.ac.manchester.tornado.api.memory.ObjectBuffer;
+import uk.ac.manchester.tornado.api.memory.XPUBuffer;
 import uk.ac.manchester.tornado.drivers.spirv.SPIRVDeviceContext;
 import uk.ac.manchester.tornado.runtime.TornadoCoreRuntime;
-import uk.ac.manchester.tornado.runtime.common.Tornado;
+import uk.ac.manchester.tornado.runtime.common.TornadoLogger;
+import uk.ac.manchester.tornado.runtime.common.TornadoOptions;
 
-public abstract class SPIRVArrayWrapper<T> implements ObjectBuffer {
+public abstract class SPIRVArrayWrapper<T> implements XPUBuffer {
 
     private static final int INIT_VALUE = -1;
     protected final SPIRVDeviceContext deviceContext;
@@ -54,6 +51,7 @@ public abstract class SPIRVArrayWrapper<T> implements ObjectBuffer {
     private long bufferOffset;
     private long bufferSize;
     private long setSubRegionSize;
+    private final TornadoLogger logger;
 
     public SPIRVArrayWrapper(SPIRVDeviceContext deviceContext, JavaKind javaKind, long batchSize) {
         this.deviceContext = deviceContext;
@@ -62,6 +60,7 @@ public abstract class SPIRVArrayWrapper<T> implements ObjectBuffer {
         this.bufferId = INIT_VALUE;
         this.bufferSize = INIT_VALUE;
         this.bufferOffset = 0;
+        this.logger = new TornadoLogger(this.getClass());
 
         this.arrayLengthOffset = TornadoCoreRuntime.getVMConfig().arrayOopDescLengthOffset();
         this.arrayHeaderSize = TornadoCoreRuntime.getVMConfig().getArrayBaseOffset(kind);
@@ -85,13 +84,13 @@ public abstract class SPIRVArrayWrapper<T> implements ObjectBuffer {
         }
     }
 
-    protected abstract int readArrayData(long bufferId, long offset, long bytes, T value, long hostOffset, int[] waitEvents);
+    protected abstract int readArrayData(long executionPlanId, long bufferId, long offset, long bytes, T value, long hostOffset, int[] waitEvents);
 
-    protected abstract void writeArrayData(long bufferId, long offset, long bytes, T value, long hostOffset, int[] waitEvents);
+    protected abstract void writeArrayData(long executionPlanId, long bufferId, long offset, long bytes, T value, long hostOffset, int[] waitEvents);
 
-    protected abstract int enqueueReadArrayData(long bufferId, long offset, long bytes, T value, long hostOffset, int[] waitEvents);
+    protected abstract int enqueueReadArrayData(long executionPlanId, long bufferId, long offset, long bytes, T value, long hostOffset, int[] waitEvents);
 
-    protected abstract int enqueueWriteArrayData(long bufferId, long offset, long bytes, T value, long hostOffset, int[] waitEvents);
+    protected abstract int enqueueWriteArrayData(long executionPlanId, long bufferId, long offset, long bytes, T value, long hostOffset, int[] waitEvents);
 
     @Override
     public long toBuffer() {
@@ -99,7 +98,7 @@ public abstract class SPIRVArrayWrapper<T> implements ObjectBuffer {
     }
 
     @Override
-    public void setBuffer(ObjectBufferWrapper bufferWrapper) {
+    public void setBuffer(XPUBufferWrapper bufferWrapper) {
         this.bufferId = bufferWrapper.buffer;
         this.bufferOffset = bufferWrapper.bufferOffset;
 
@@ -112,8 +111,8 @@ public abstract class SPIRVArrayWrapper<T> implements ObjectBuffer {
     }
 
     @Override
-    public void read(Object object) {
-        read(object, 0, null, false);
+    public void read(long executionPlanId, Object object) {
+        read(executionPlanId, object, 0, 0, null, false);
     }
 
     /*
@@ -131,36 +130,26 @@ public abstract class SPIRVArrayWrapper<T> implements ObjectBuffer {
      * Retrieves a buffer that will contain the contents of the array header. This
      * also re-sizes the buffer.
      */
-    private boolean validateArrayHeader(final T array) {
+    private boolean validateArrayHeader(long executionPlanId, final T array) {
         final SPIRVByteBuffer header = prepareArrayHeader();
-        header.read();
+        header.read(executionPlanId);
         final int numElements = header.getInt(arrayLengthOffset);
         final boolean valid = numElements == Array.getLength(array);
         if (!valid) {
-            fatal("Array: expected=%d, got=%d", Array.getLength(array), numElements);
+            logger.fatal("Array: expected=%d, got=%d", Array.getLength(array), numElements);
             header.dump(8);
         }
         return valid;
     }
 
     @Override
-    public int read(Object reference, long hostOffset, int[] events, boolean useDeps) {
+    public int read(long executionPlanId, Object reference, long hostOffset, long partialReadSize, int[] events, boolean useDeps) {
         final T array = cast(reference);
         if (array == null) {
             throw new TornadoRuntimeException("[ERROR] output data is NULL");
         }
-
-        if (VALIDATE_ARRAY_HEADERS) {
-            if (validateArrayHeader(array)) {
-                return readArrayData(toBuffer(), bufferOffset + arrayHeaderSize, bufferSize - arrayHeaderSize, array, hostOffset, (useDeps) ? events : null);
-            } else {
-                shouldNotReachHere("Array header is invalid");
-            }
-        } else {
-            final long numBytes = getSizeSubRegion() > 0 ? getSizeSubRegion() : (bufferSize - arrayHeaderSize);
-            return readArrayData(toBuffer(), bufferOffset + arrayHeaderSize, numBytes, array, hostOffset, (useDeps) ? events : null);
-        }
-        return -1;
+        final long numBytes = getSizeSubRegionSize() > 0 ? getSizeSubRegionSize() : (bufferSize - arrayHeaderSize);
+        return readArrayData(executionPlanId, toBuffer(), bufferOffset + arrayHeaderSize, numBytes, array, hostOffset, (useDeps) ? events : null);
     }
 
     // FIXME <REFACTOR> <Same for all backends>
@@ -183,24 +172,24 @@ public abstract class SPIRVArrayWrapper<T> implements ObjectBuffer {
     }
 
     @Override
-    public void write(final Object valueReference) {
+    public void write(long executionPlanId, final Object valueReference) {
         final T array = cast(valueReference);
         if (array == null) {
             throw new TornadoRuntimeException("[SPIRV][Error] data are NULL");
         }
         buildArrayHeader(Array.getLength(array));
-        writeArrayData(toBuffer(), arrayHeaderSize + bufferOffset, bufferSize - arrayHeaderSize, array, 0, null);
+        writeArrayData(executionPlanId, toBuffer(), arrayHeaderSize + bufferOffset, bufferSize - arrayHeaderSize, array, 0, null);
     }
 
     // FIXME <REFACTOR> <S>
     @Override
-    public int enqueueRead(Object objectReference, long hostOffset, int[] events, boolean useDeps) {
+    public int enqueueRead(long executionPlanId, Object objectReference, long hostOffset, int[] events, boolean useDeps) {
         final T array = cast(objectReference);
         if (array == null) {
             throw new TornadoRuntimeException("[ERROR] output data is NULL");
         }
         final int returnEvent;
-        returnEvent = enqueueReadArrayData(toBuffer(), bufferOffset + arrayHeaderSize, bufferSize - arrayHeaderSize, array, hostOffset, (useDeps) ? events : null);
+        returnEvent = enqueueReadArrayData(executionPlanId, toBuffer(), bufferOffset + arrayHeaderSize, bufferSize - arrayHeaderSize, array, hostOffset, (useDeps) ? events : null);
         return useDeps ? returnEvent : -1;
     }
 
@@ -216,9 +205,8 @@ public abstract class SPIRVArrayWrapper<T> implements ObjectBuffer {
         return header;
     }
 
-    // FIXME <REFACTOR> <S>
     @Override
-    public List<Integer> enqueueWrite(Object reference, long batchSize, long hostOffset, int[] events, boolean useDeps) {
+    public List<Integer> enqueueWrite(long executionPlanId, Object reference, long batchSize, long hostOffset, int[] events, boolean useDeps) {
         final T array = cast(reference);
         ArrayList<Integer> listEvents = new ArrayList<>();
 
@@ -230,28 +218,25 @@ public abstract class SPIRVArrayWrapper<T> implements ObjectBuffer {
         // buffer
         final int headerEvent;
         if (batchSize <= 0) {
-            headerEvent = buildArrayHeader(Array.getLength(array)).enqueueWrite((useDeps) ? events : null);
+            headerEvent = buildArrayHeader(Array.getLength(array)).enqueueWrite(executionPlanId, (useDeps) ? events : null);
         } else {
-            headerEvent = buildArrayHeaderBatch(batchSize).enqueueWrite((useDeps) ? events : null);
+            headerEvent = buildArrayHeaderBatch(batchSize).enqueueWrite(executionPlanId, (useDeps) ? events : null);
         }
-        returnEvent = enqueueWriteArrayData(toBuffer(), bufferOffset + arrayHeaderSize, bufferSize - arrayHeaderSize, array, hostOffset, (useDeps) ? events : null);
+        returnEvent = enqueueWriteArrayData(executionPlanId, toBuffer(), bufferOffset + arrayHeaderSize, bufferSize - arrayHeaderSize, array, hostOffset, (useDeps) ? events : null);
 
         listEvents.add(headerEvent);
         listEvents.add(returnEvent);
-        return useDeps ? listEvents : null;
+        return listEvents;
     }
 
-    // FIXME <REFACTOR> <S>
     private long sizeOf(final T array) {
         return (long) arrayHeaderSize + ((long) Array.getLength(array) * (long) kind.getByteCount());
     }
 
-    // FIXME <REFACTOR> <S>
     private long sizeOfBatch(long batchSize) {
         return (long) arrayHeaderSize + batchSize;
     }
 
-    // FIXME <REFACTOR> <S>
     @Override
     public void allocate(Object objectReference, long batchSize) {
         final T hostArray = cast(objectReference);
@@ -265,26 +250,26 @@ public abstract class SPIRVArrayWrapper<T> implements ObjectBuffer {
             throw new TornadoMemoryException("[ERROR] Bytes Allocated <= 0: " + bufferSize);
         }
 
-        this.bufferId = deviceContext.getBufferProvider().getBufferWithSize(bufferSize);
+        this.bufferId = deviceContext.getBufferProvider().getOrAllocateBufferWithSize(bufferSize);
 
-        if (Tornado.FULL_DEBUG) {
-            info("allocated: array kind=%s, size=%s, length offset=%d, header size=%d", kind.getJavaName(), humanReadableByteCount(bufferSize, true), arrayLengthOffset, arrayHeaderSize);
-            info("allocated: %s", toString());
+        if (TornadoOptions.FULL_DEBUG) {
+            logger.info("allocated: array kind=%s, size=%s, length offset=%d, header size=%d", kind.getJavaName(), humanReadableByteCount(bufferSize, true), arrayLengthOffset, arrayHeaderSize);
+            logger.info("allocated: %s", toString());
         }
 
     }
 
     @Override
-    public void deallocate() {
+    public void markAsFreeBuffer() {
         TornadoInternalError.guarantee(bufferId != INIT_VALUE, "Fatal error: trying to deallocate an invalid buffer");
 
-        deviceContext.getBufferProvider().markBufferReleased(bufferId, bufferSize);
+        deviceContext.getBufferProvider().markBufferReleased(bufferId);
         bufferId = INIT_VALUE;
         bufferSize = INIT_VALUE;
 
-        if (Tornado.FULL_DEBUG) {
-            info("deallocated: array kind=%s, size=%s, length offset=%d, header size=%d", kind.getJavaName(), humanReadableByteCount(bufferSize, true), arrayLengthOffset, arrayHeaderSize);
-            info("deallocated: %s", toString());
+        if (TornadoOptions.FULL_DEBUG) {
+            logger.info("deallocated: array kind=%s, size=%s, length offset=%d, header size=%d", kind.getJavaName(), humanReadableByteCount(bufferSize, true), arrayLengthOffset, arrayHeaderSize);
+            logger.info("deallocated: %s", toString());
         }
     }
 
@@ -294,13 +279,18 @@ public abstract class SPIRVArrayWrapper<T> implements ObjectBuffer {
     }
 
     @Override
-    public long getSizeSubRegion() {
+    public long getSizeSubRegionSize() {
         return setSubRegionSize;
     }
 
     @Override
     public void setSizeSubRegion(long batchSize) {
         this.setSubRegionSize = batchSize;
+    }
+
+    @Override
+    public long deallocate() {
+        return deviceContext.getBufferProvider().deallocate();
     }
 
 }

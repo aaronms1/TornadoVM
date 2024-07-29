@@ -2,7 +2,7 @@
  * This file is part of Tornado: A heterogeneous programming framework:
  * https://github.com/beehive-lab/tornadovm
  *
- * Copyright (c) 2013-2022, APT Group, Department of Computer Science,
+ * Copyright (c) 2013-2024, APT Group, Department of Computer Science,
  * The University of Manchester. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
@@ -12,7 +12,7 @@
  *
  * This code is distributed in the hope that it will be useful, but WITHOUT
  * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
- * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License
  * version 2 for more details (a copy is included in the LICENSE file that
  * accompanied this code).
  *
@@ -25,13 +25,45 @@ package uk.ac.manchester.tornado.runtime.common;
 
 import static uk.ac.manchester.tornado.runtime.common.Tornado.getProperty;
 
+import uk.ac.manchester.tornado.api.types.arrays.TornadoNativeArray;
+
 public class TornadoOptions {
 
-    public static final String FALSE = "FALSE";
-    public static final String TRUE = "TRUE";
+    private static final String FALSE = "FALSE";
+    private static final String TRUE = "TRUE";
+
+    /**
+     * Use internal timers for profiling in ns if enabled, in ms if disabled. Default is ns (enabled).
+     */
     public static final boolean TIME_IN_NANOSECONDS = Boolean.parseBoolean(System.getProperty("tornado.ns.time", TRUE));
-    public static final int DEFAULT_DRIVER_INDEX = Integer.parseInt(Tornado.getProperty("tornado.driver", "0"));
+
+    /**
+     * Index for the default backend in TornadoVM. Default is 0.
+     */
+    public static final int DEFAULT_BACKEND_INDEX = Integer.parseInt(Tornado.getProperty("tornado.backend", "0"));
+
+    /**
+     * Index for the default device in TornadoVM. Default is 0.
+     */
     public static final int DEFAULT_DEVICE_INDEX = Integer.parseInt(Tornado.getProperty("tornado.device", "0"));
+
+    /**
+     * Enable/disable loop interchange optimization from the Sketcher compilation. This optimization is enabled
+     * by default. The optimization that reverses the ordering of the loops is:
+     * {@link uk.ac.manchester.tornado.runtime.graal.phases.sketcher.TornadoApiReplacement}.
+     */
+    public static final boolean TORNADO_LOOP_INTERCHANGE = getBooleanValue("tornado.loop.interchange", "True");
+
+    /**
+     * Enable thread deployment debugging from the TornadoVM runtime and code dispatcher.
+     */
+    public static final boolean THREAD_INFO = getBooleanValue("tornado.threadInfo", FALSE);
+
+    /**
+     * Enable the runtime to dump the generated code (e.g., OpenCL, CUDA PTX or SPIR-V) from the TornadoVM JIT Compiler.
+     */
+    public static final boolean PRINT_KERNEL_SOURCE = getBooleanValue("tornado.print.kernel", FALSE);
+
     /**
      * Priority of the PTX Backend. The higher the number, the more priority over
      * the rest of the backends.
@@ -43,7 +75,7 @@ public class TornadoOptions {
      */
     public static final int OPENCL_BACKEND_PRIORITY = Integer.parseInt(Tornado.getProperty("tornado.opencl.priority", "10"));
     /**
-     * Priority of the SPIRV Backend. The higher the number, the more priority over
+     * Priority of the SPIR-V Backend. The higher the number, the more priority over
      * the rest of the backends.
      */
     public static final int SPIRV_BACKEND_PRIORITY = Integer.parseInt(Tornado.getProperty("tornado.spirv.priority", "11"));
@@ -64,12 +96,7 @@ public class TornadoOptions {
      * Option to print TornadoVM Internal Bytecodes.
      */
     public static final boolean PRINT_BYTECODES = getBooleanValue("tornado.print.bytecodes", FALSE);
-    /**
-     * Option to debug dynamic reconfiguration policies.
-     * <p>
-     * Use `-Dtornado.dynamic.verbose=True`.
-     */
-    public static final boolean DEBUG_POLICY = getBooleanValue("tornado.dynamic.verbose", FALSE);
+
     /**
      * Option to enable experimental and new option for performing automatic full
      * reductions.
@@ -86,7 +113,7 @@ public class TornadoOptions {
     /**
      * Enable/Disable FMA Optimizations. True by default.
      */
-    public static final boolean ENABLE_FMA = getBooleanValue("tornado.enable.fma", "True");
+    public static final boolean ENABLE_FMA = getBooleanValue("tornado.enable.fma", TRUE);
     /**
      * Enable/Disable Fix Reads Optimization. True by default.
      */
@@ -95,10 +122,7 @@ public class TornadoOptions {
      * Enable/Disable events dumping on program finish. False by default.
      */
     public static final boolean DUMP_EVENTS = Boolean.parseBoolean(getProperty("tornado.events.dump", FALSE));
-    /**
-     * Prints the generated code by the TornadoVM compiler. Default is False.
-     */
-    public static final boolean PRINT_SOURCE = Boolean.parseBoolean(getProperty("tornado.print.kernel", FALSE));
+
     /**
      * Prints the generated code by the TornadoVM compiler. Default is False.
      */
@@ -172,9 +196,9 @@ public class TornadoOptions {
      */
     public static final boolean INLINE_DURING_BYTECODE_PARSING = getBooleanValue("tornado.compiler.bytecodeInlining", FALSE);
     /**
-     * Use Level Zero as a dispatcher for SPIRV
+     * Use Level Zero or OpenCL as the SPIR-V Code Dispatcher and Runtime. Allowed values: "opencl", "levelzero". The default option is "opencl".
      */
-    public static final boolean USE_LEVELZERO_FOR_SPIRV = getBooleanValue("tornado.spirv.levelzero", TRUE);
+    public static final String SPIRV_DISPATCHER = getProperty("tornado.spirv.dispatcher", "opencl");
     /**
      * Check I/O parameters for every task within a task-graph.
      */
@@ -194,11 +218,11 @@ public class TornadoOptions {
      */
     public static final boolean SPIRV_DIRECT_CALL_WITH_LOAD_HEAP = getBooleanValue("tornado.spirv.directcall.heap", FALSE);
     /**
-     * Trace code generation
+     * Trace code generation.
      */
     public static final boolean TRACE_CODE_GEN = getBooleanValue("tornado.logger.codegen", FALSE);
     /**
-     * Trace code generation
+     * Trace code generation.
      */
     public static final boolean TRACE_BUILD_LIR = getBooleanValue("tornado.logger.buildlir", FALSE);
     /**
@@ -206,11 +230,11 @@ public class TornadoOptions {
      */
     public static final boolean ENABLE_NATIVE_FUNCTION = getBooleanValue("tornado.enable.nativeFunctions", TRUE);
     /**
-     * - It enables more aggressive math optimizations
+     * - It enables more aggressive math optimizations.
      */
     public static final boolean MATH_OPTIMIZATIONS = getBooleanValue("tornado.enable.mathOptimizations", TRUE);
     /**
-     * It enables more fast math optimizations
+     * It enables more fast math optimizations.
      */
     public static final boolean FAST_MATH_OPTIMIZATIONS = getBooleanValue("tornado.enable.fastMathOptimizations", TRUE);
     /**
@@ -224,7 +248,7 @@ public class TornadoOptions {
     public static final boolean USE_LEVELZERO_THREAD_DISPATCHER_SUGGESTIONS = getBooleanValue("tornado.spirv.levelzero.thread.dispatcher", TRUE);
     /**
      * Memory Alignment for the Level Zero buffers (shared memory and or device
-     * memory)
+     * memory).
      */
     public static final int LEVEL_ZERO_BUFFER_ALIGNMENT = getIntValue("tornado.spirv.levelzero.alignment", "64");
     /**
@@ -234,28 +258,51 @@ public class TornadoOptions {
     public static final boolean LEVEL_ZERO_EXTENDED_MEMORY_MODE = getBooleanValue("tornado.spirv.levelzero.extended.memory", TRUE);
     /**
      * If enabled, the TornadoVM will substitute the last READ (data transfer from
-     * the TRANSFER_DEVICE_TO_HOST) using a STREAM_OUT_BLOCKING. This is FALSE by
+     * the device to the host) using a STREAM_OUT_BLOCKING. This is FALSE by
      * default.
      */
-    public static final boolean ENABLE_STREAM_OUT_BLOCKING = getBooleanValue("tornado.enable.streamOut.blocking", FALSE);
+    public static final boolean ENABLE_STREAM_OUT_BLOCKING = getBooleanValue("tornado.enable.streamOut.blocking", TRUE);
+
     /**
      * Option to run concurrently on multiple device in single or multi-backend
      * configuration. False by default.
      */
-    public static final boolean CONCURRENT_INTERPRETERS = Boolean.parseBoolean(System.getProperty("tornado.concurrent.devices", "False"));
+    public static final boolean CONCURRENT_INTERPRETERS = Boolean.parseBoolean(System.getProperty("tornado.concurrent.devices", FALSE));
 
-    public static String PROFILER_LOG = "tornado.log.profiler";
-    public static String PROFILER = "tornado.profiler";
+    /**
+     * Panama Object Header in TornadoVM.
+     */
+    public static final long PANAMA_OBJECT_HEADER_SIZE = TornadoNativeArray.ARRAY_HEADER;
+
+    /**
+     * Option to define the maximum number of internal events related to OpenCL/PTX/SPIR-V events to keep alive.
+     * This is application specific. In a large application, there are probably many events that need to keep alive
+     * to perform the sync.
+     */
+    public static final int MAX_EVENTS = getIntValue("tornado.max.events", "32768");
+
+    /**
+     * Partitions the iteration space into blocks. When running on CPUs, the number of blocks is equal to the
+     * number of CPU visible cores at runtime. False by default.
+     */
+    public static boolean USE_BLOCK_SCHEDULER = getBooleanValue("tornado.scheduler.block", FALSE);
+
+    public static boolean TORNADO_PROFILER_LOG = false;
+
+    public static boolean TORNADO_PROFILER = false;
+
     /**
      * Option to load FPGA pre-compiled binaries.
      */
     public static StringBuilder FPGA_BINARIES = System.getProperty("tornado.precompiled.binary", null) != null ? new StringBuilder(System.getProperty("tornado.precompiled.binary", null)) : null;
+    private static String PROFILER_LOG = "tornado.log.profiler";
+    private static String PROFILER = "tornado.profiler";
 
     /**
      * Option for enabling saving the profiler into a file.
      */
     public static boolean PROFILER_LOGS_ACCUMULATE() {
-        return getBooleanValue(PROFILER_LOG, FALSE);
+        return TornadoOptions.TORNADO_PROFILER_LOG || getBooleanValue(PROFILER_LOG, FALSE);
     }
 
     /**
@@ -272,8 +319,73 @@ public class TornadoOptions {
      * @return boolean.
      */
     public static boolean isProfilerEnabled() {
-        return getBooleanValue(PROFILER, FALSE);
+        return TORNADO_PROFILER || getBooleanValue(PROFILER, FALSE);
     }
+
+    /**
+     * Set Loop unrolling factor for the FPGA compilation. Default is set to 2.
+     */
+    public static final int UNROLL_FACTOR = Integer.parseInt(getProperty("tornado.unroll.factor", "2"));
+
+    /**
+     * Enable basic debug information. Disabled by default.
+     */
+    public static final boolean DEBUG = getBooleanValue("tornado.debug", FALSE);
+
+    /**
+     * Enable Full Debug Mode. Disabled by default.
+     */
+    public static final boolean FULL_DEBUG = getBooleanValue("tornado.fullDebug", FALSE);
+
+    /**
+     * Enable debugging of the kernel parameters. Disable by default.
+     */
+    public static final boolean DEBUG_KERNEL_ARGS = getBooleanValue("tornado.debug.kernelargs", FALSE);
+
+    /**
+     * Use flush in OpenCL to sync all pending commands from the command queue. Disabled by default.
+     */
+    public static final boolean USE_SYNC_FLUSH = getBooleanValue("tornado.opencl.syncflush", FALSE);
+
+    /**
+     * Run VM Flush when TornadoVM finishes the execution of the TornadoVM interpreter.
+     */
+    public static final boolean USE_VM_FLUSH = getBooleanValue("tornado.vmflush", TRUE);
+
+    /**
+     * Define the maximum number of events to wait for in the OpenCL Event Pool. Default is 64.
+     */
+    public static final int MAX_WAIT_EVENTS = getIntValue("tornado.eventpool.maxwaitevents", "64");
+
+    /**
+     * Define the event windows for the Internal Event Pool. Default is 1024.
+     */
+    public static final int EVENT_WINDOW = getIntValue("tornado.eventpool.size", "1024");
+
+    /**
+     * Enable BIFS Math operations. Disabled by default.
+     */
+    public static final boolean TORNADO_ENABLE_BIFS = getBooleanValue("tornado.bifs.enable", FALSE);
+
+    /**
+     * Enable VM Dependency Path. Disabled by default. This option is only for testing.
+     */
+    public static final boolean VM_USE_DEPS = getBooleanValue("tornado.vm.deps", FALSE);
+
+    /**
+     * Enable OpenCL Profiling. Enabled by default.
+     */
+    public static final boolean ENABLE_OPENCL_PROFILING = getBooleanValue("tornado.opencl.profiling.enable", TRUE);
+
+    /**
+     * Enable to dump the generated methods to a file for debugging purposes. Disabled by default.
+     */
+    public static final boolean DUMP_COMPILED_METHODS = getBooleanValue("tornado.compiled.dump", FALSE);
+
+    /**
+     * Enable out-of-order execution. False by default.
+     */
+    public static final boolean ENABLE_OOO_EXECUTION = getBooleanValue("tornado.ooo-execution.enable", FALSE);
 
     /**
      * Option for enabling partial loop unrolling. The unroll factor can be
@@ -298,5 +410,4 @@ public class TornadoOptions {
         String contextEmulatorXilinxFPGA = System.getenv("XCL_EMULATION_MODE");
         return (contextEmulatorIntelFPGA != null && (contextEmulatorIntelFPGA.equals("1"))) || (contextEmulatorXilinxFPGA != null && (contextEmulatorXilinxFPGA.equals("sw_emu")));
     }
-
 }

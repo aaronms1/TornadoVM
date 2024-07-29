@@ -12,7 +12,7 @@
  *
  * This code is distributed in the hope that it will be useful, but WITHOUT
  * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
- * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License
  * version 2 for more details (a copy is included in the LICENSE file that
  * accompanied this code).
  *
@@ -26,11 +26,12 @@ package uk.ac.manchester.tornado.drivers.spirv.graal.compiler;
 import static org.graalvm.compiler.phases.common.DeadCodeEliminationPhase.Optionality.Optional;
 import static uk.ac.manchester.tornado.api.exceptions.TornadoInternalError.guarantee;
 import static uk.ac.manchester.tornado.runtime.TornadoCoreRuntime.getDebugContext;
-import static uk.ac.manchester.tornado.runtime.common.Tornado.DUMP_COMPILED_METHODS;
+import static uk.ac.manchester.tornado.runtime.common.TornadoOptions.DUMP_COMPILED_METHODS;
 
 import java.io.File;
 import java.io.IOException;
 import java.io.PrintWriter;
+import java.lang.reflect.Array;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.file.Files;
@@ -84,8 +85,10 @@ import uk.ac.manchester.tornado.drivers.spirv.SPIRVBackend;
 import uk.ac.manchester.tornado.drivers.spirv.graal.SPIRVProviders;
 import uk.ac.manchester.tornado.drivers.spirv.graal.SPIRVSuitesProvider;
 import uk.ac.manchester.tornado.drivers.spirv.graal.asm.SPIRVAssembler;
-import uk.ac.manchester.tornado.runtime.common.Tornado;
+import uk.ac.manchester.tornado.runtime.common.BatchCompilationConfig;
+import uk.ac.manchester.tornado.runtime.common.RuntimeUtilities;
 import uk.ac.manchester.tornado.runtime.common.TornadoLogger;
+import uk.ac.manchester.tornado.runtime.common.TornadoOptions;
 import uk.ac.manchester.tornado.runtime.graal.TornadoLIRSuites;
 import uk.ac.manchester.tornado.runtime.graal.TornadoSuites;
 import uk.ac.manchester.tornado.runtime.graal.phases.TornadoHighTierContext;
@@ -112,11 +115,11 @@ public class SPIRVCompiler {
 
     private static final SPIRVIRGenerationPhase LIR_GENERATION_PHASE = new SPIRVIRGenerationPhase();
 
-    private static SPIRVCompilationResult compile(SPIRVCompilationRequest r) {
+    private synchronized static SPIRVCompilationResult compile(SPIRVCompilationRequest r) {
         assert !r.graph.isFrozen();
         try (DebugContext.Scope s0 = getDebugContext().scope("GraalCompiler", r.graph, r.providers.getCodeCache()); DebugCloseable a = CompilerTimer.start(getDebugContext())) {
             emitFrontEnd(r.providers, r.backend, r.installedCodeOwner, r.args, r.meta, r.graph, r.graphBuilderSuite, r.optimisticOpts, r.profilingInfo, r.suites, r.isKernel, r.buildGraph,
-                    r.batchThreads);
+                    r.batchCompilationConfig);
             boolean isParallel = false;
             /*
              * A task is determined as parallel if: (i) it has loops annotated with {@link
@@ -139,7 +142,7 @@ public class SPIRVCompiler {
 
     private static void emitFrontEnd(Providers providers, SPIRVBackend backend, ResolvedJavaMethod installedCodeOwner, Object[] args, TaskMetaData meta, StructuredGraph graph,
             PhaseSuite<HighTierContext> graphBuilderSuite, OptimisticOptimizations optimisticOpts, ProfilingInfo profilingInfo, TornadoSuites suites, boolean isKernel, boolean buildGraph,
-            long batchThreads) {
+            BatchCompilationConfig batchCompilationConfig) {
 
         try (DebugContext.Scope s = getDebugContext().scope("SPIRVFrontend", new DebugDumpScope("SPIRVFrontend")); DebugCloseable a = FrontEnd.start(getDebugContext())) {
 
@@ -148,7 +151,7 @@ public class SPIRVCompiler {
              */
             ((SPIRVCanonicalizer) suites.getHighTier().getCustomCanonicalizer()).setContext(providers.getMetaAccess(), installedCodeOwner, args, meta);
 
-            final TornadoHighTierContext highTierContext = new TornadoHighTierContext(providers, graphBuilderSuite, optimisticOpts, installedCodeOwner, args, meta, isKernel, batchThreads);
+            final TornadoHighTierContext highTierContext = new TornadoHighTierContext(providers, graphBuilderSuite, optimisticOpts, installedCodeOwner, args, meta, isKernel, batchCompilationConfig);
             if (buildGraph) {
                 if (isGraphEmpty(graph)) {
                     graphBuilderSuite.apply(graph, highTierContext);
@@ -284,33 +287,33 @@ public class SPIRVCompiler {
         }
     }
 
-    // FIXME: <REFACTOR> Common for PTX and SPIRV
-    public static String buildKernelName(String methodName, SchedulableTask task) {
+    private static String buildFullKernelName(String methodName, SchedulableTask task) {
         StringBuilder sb = new StringBuilder(methodName);
+        for (Object arg : task.getArguments()) {
+            // Object is either array or primitive
+            sb.append('_');
+            Class<?> argClass = arg.getClass();
+            if (RuntimeUtilities.isBoxedPrimitiveClass(argClass)) {
+                // Only need to append value.
+                // If negative value, remove the minus sign in front
+                sb.append(arg.toString().replace('.', '_').replaceAll("-", ""));
+            } else if (argClass.isArray() && RuntimeUtilities.isPrimitiveArray(argClass)) {
+                // Need to append type and length
+                sb.append(argClass.getComponentType().getName());
+                sb.append(Array.getLength(arg));
+            } else {
+                sb.append(argClass.getName().replace('.', '_'));
+                // Since with objects there is no way to know what will be a
+                // constant differentiate using the hashcode of the object
+                sb.append('_');
+                sb.append(arg.hashCode());
+            }
+        }
+        return sb.toString();
+    }
 
-        // for (Object arg : task.getArguments()) {
-        // // Object is either array or primitive
-        // sb.append('_');
-        // Class<?> argClass = arg.getClass();
-        // if (RuntimeUtilities.isBoxedPrimitiveClass(argClass)) {
-        // // Only need to append value.
-        // // If negative value, remove the minus sign in front
-        // sb.append(arg.toString().replace('.', '_').replaceAll("-", ""));
-        // } else if (argClass.isArray() && RuntimeUtilities.isPrimitiveArray(argClass))
-        // {
-        // // Need to append type and length
-        // sb.append(argClass.getComponentType().getName());
-        // sb.append(Array.getLength(arg));
-        // } else {
-        // sb.append(argClass.getName().replace('.', '_'));
-        //
-        // // Since with objects there is no way to know what will be a
-        // // constant differentiate using the hashcode of the object
-        // sb.append('_');
-        // sb.append(arg.hashCode());
-        // }
-        // }
-
+    public static String buildKernelName(String methodName) {
+        StringBuilder sb = new StringBuilder(methodName);
         return sb.toString();
     }
 
@@ -318,16 +321,19 @@ public class SPIRVCompiler {
         final StructuredGraph kernelGraph = (StructuredGraph) sketch.getGraph().copy(getDebugContext());
         ResolvedJavaMethod resolvedJavaMethod = kernelGraph.method();
 
-        TornadoLogger.info("Compiling sketch %s on %s", resolvedJavaMethod.getName(), backend.getDeviceContext().getDevice().getDeviceName());
+        new TornadoLogger().info("Compiling sketch %s on %s", resolvedJavaMethod.getName(), backend.getDeviceContext().getDevice().getDeviceName());
 
         final TaskMetaData taskMeta = task.meta();
         final Object[] args = task.getArguments();
         final long batchThreads = (taskMeta.getNumThreads() > 0) ? taskMeta.getNumThreads() : task.getBatchThreads();
+        final int batchNumber = task.getBatchNumber();
+        final long batchSize = task.getBatchSize();
+        BatchCompilationConfig batchCompilationConfig = new BatchCompilationConfig(batchThreads, batchNumber, batchSize);
 
         OptimisticOptimizations optimisticOptimizations = OptimisticOptimizations.ALL;
         ProfilingInfo profilingInfo = resolvedJavaMethod.getProfilingInfo();
 
-        SPIRVCompilationResult kernelCompilationResult = new SPIRVCompilationResult(task.getId(), buildKernelName(resolvedJavaMethod.getName(), task), taskMeta);
+        SPIRVCompilationResult kernelCompilationResult = new SPIRVCompilationResult(task.getId(), buildKernelName(resolvedJavaMethod.getName()), taskMeta);
         CompilationResultBuilderFactory factory = CompilationResultBuilderFactory.Default;
 
         Set<ResolvedJavaMethod> methods = new HashSet<>();
@@ -351,13 +357,13 @@ public class SPIRVCompiler {
                 factory,
                 true,
                 false,
-                batchThreads,
+                batchCompilationConfig,
                 profiler);
         // @formatter:on
 
         kernelCompilationRequest.execute();
 
-        if (Tornado.DUMP_COMPILED_METHODS) {
+        if (TornadoOptions.DUMP_COMPILED_METHODS) {
             methods.add(kernelGraph.method());
             methods.addAll(kernelGraph.getMethods());
             Collections.addAll(methods, kernelCompilationResult.getMethods());
@@ -366,7 +372,7 @@ public class SPIRVCompiler {
         final Deque<ResolvedJavaMethod> workList = new ArrayDeque<>(kernelCompilationResult.getNonInlinedMethods());
         while (!workList.isEmpty()) {
             final ResolvedJavaMethod currentMethod = workList.pop();
-            Sketch currentSketch = TornadoSketcher.lookup(currentMethod, task.meta().getDriverIndex(), taskMeta.getDeviceIndex());
+            Sketch currentSketch = TornadoSketcher.lookup(currentMethod, task.meta().getBackendIndex(), taskMeta.getDeviceIndex());
             final StructuredGraph graph = (StructuredGraph) currentSketch.getGraph().copy(getDebugContext());
 
             final SPIRVCompilationResult compilationResult = new SPIRVCompilationResult(task.getId(), currentMethod.getName(), taskMeta);
@@ -391,7 +397,7 @@ public class SPIRVCompiler {
                     factory,
                     false,
                     false,
-                    0,
+                    new BatchCompilationConfig(0, 0, 0),
                     profiler
                     );
             // @formatter:on
@@ -435,8 +441,9 @@ public class SPIRVCompiler {
                 try {
                     Files.createDirectories(outDir);
                 } catch (IOException e) {
-                    TornadoLogger.error("unable to create cache dir: %s", outDir.toString());
-                    TornadoLogger.error(e.getMessage());
+                    TornadoLogger tornadoLogger = new TornadoLogger();
+                    tornadoLogger.error("unable to create cache dir: %s", outDir.toString());
+                    tornadoLogger.error(e.getMessage());
                 }
             }
 
@@ -448,7 +455,7 @@ public class SPIRVCompiler {
                     pw.printf("%s,%s\n", m.getDeclaringClass().getName(), m.getName());
                 }
             } catch (IOException e) {
-                TornadoLogger.error("unable to dump source: ", e.getMessage());
+                new TornadoLogger().error("unable to dump source: ", e.getMessage());
             }
         }
 
@@ -471,12 +478,13 @@ public class SPIRVCompiler {
         public final CompilationResultBuilderFactory factory;
         public final boolean isKernel;
         public final boolean buildGraph;
-        public final long batchThreads;
+        public final BatchCompilationConfig batchCompilationConfig;
         public TornadoProfiler profiler;
 
         public SPIRVCompilationRequest(StructuredGraph graph, ResolvedJavaMethod installedCodeOwner, Object[] args, TaskMetaData meta, Providers providers, SPIRVBackend backend,
                 PhaseSuite<HighTierContext> graphBuilderSuite, OptimisticOptimizations optimisticOpts, ProfilingInfo profilingInfo, TornadoSuites suites, TornadoLIRSuites lirSuites,
-                SPIRVCompilationResult compilationResult, CompilationResultBuilderFactory factory, boolean isKernel, boolean buildGraph, long batchThreads, TornadoProfiler profiler) {
+                SPIRVCompilationResult compilationResult, CompilationResultBuilderFactory factory, boolean isKernel, boolean buildGraph, BatchCompilationConfig batchCompilationConfig,
+                TornadoProfiler profiler) {
             this.graph = graph;
             this.installedCodeOwner = installedCodeOwner;
             this.args = args;
@@ -492,7 +500,7 @@ public class SPIRVCompiler {
             this.factory = factory;
             this.isKernel = isKernel;
             this.buildGraph = buildGraph;
-            this.batchThreads = batchThreads;
+            this.batchCompilationConfig = batchCompilationConfig;
             this.profiler = profiler;
         }
 

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2021, 2022-2023, APT Group, Department of Computer Science,
+ * Copyright (c) 2021, 2022-2024, APT Group, Department of Computer Science,
  * School of Engineering, The University of Manchester. All rights reserved.
  * Copyright (c) 2009, 2017, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
@@ -10,7 +10,7 @@
  *
  * This code is distributed in the hope that it will be useful, but WITHOUT
  * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
- * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License
  * version 2 for more details (a copy is included in the LICENSE file that
  * accompanied this code).
  *
@@ -32,6 +32,7 @@ import static uk.ac.manchester.tornado.drivers.ptx.graal.asm.PTXAssemblerConstan
 import static uk.ac.manchester.tornado.drivers.ptx.graal.asm.PTXAssemblerConstants.MOVE;
 import static uk.ac.manchester.tornado.drivers.ptx.graal.asm.PTXAssemblerConstants.ROUND_NEAREST_EVEN;
 import static uk.ac.manchester.tornado.drivers.ptx.graal.asm.PTXAssemblerConstants.ROUND_NEGATIVE_INFINITY_INTEGER;
+import static uk.ac.manchester.tornado.drivers.ptx.graal.asm.PTXAssemblerConstants.ROUND_POSITIVE_INFINITY_INTEGER;
 import static uk.ac.manchester.tornado.drivers.ptx.graal.asm.PTXAssemblerConstants.ROUND_TOWARD_ZERO_INTEGER;
 import static uk.ac.manchester.tornado.drivers.ptx.graal.asm.PTXAssemblerConstants.SPACE;
 import static uk.ac.manchester.tornado.drivers.ptx.graal.asm.PTXAssemblerConstants.STMT_DELIMITER;
@@ -160,7 +161,7 @@ public class PTXAssembler extends Assembler {
      * generated format strings.
      *
      * @param input
-     *            The {@link Value} input to be converted.
+     *     The {@link Value} input to be converted.
      * @return The converted format string in the PTX backend format.
      */
     public static String convertValueFromGraalFormat(Value input) {
@@ -184,8 +185,8 @@ public class PTXAssembler extends Assembler {
             }
 
             // Find the PTXVariablePrefix corresponding to the input's platform type.
-            PTXVariablePrefix typePrefix = Arrays.stream(PTXVariablePrefix.values()).filter(tp -> tp.getType().equals(input.getPlatformKind().name().toLowerCase())).findFirst()
-                    .orElseThrow(AssertionError::new);
+            PTXVariablePrefix typePrefix = Arrays.stream(PTXVariablePrefix.values()).filter(tp -> tp.getType().equals(input.getPlatformKind().name().toLowerCase())).findFirst().orElseThrow(
+                    AssertionError::new);
 
             // Create the formatted index value.
             String indexValue = isArray ? arraylocalIndexes.get(ptxKind).toString() : String.valueOf(localIndexes.get(ptxKind));
@@ -559,6 +560,8 @@ public class PTXAssembler extends Assembler {
         public static final PTXUnaryIntrinsic ABS = new PTXUnaryIntrinsic("abs", null);
         public static final PTXUnaryIntrinsic EXP2 = new PTXUnaryIntrinsic("ex2.approx", null);
         public static final PTXUnaryIntrinsic SQRT = new PTXUnaryIntrinsic("sqrt");
+
+        public static final PTXUnaryIntrinsic CEIL = new PTXUnaryIntrinsic("cvt", ROUND_POSITIVE_INFINITY_INTEGER);
         public static final PTXUnaryIntrinsic LOG2 = new PTXUnaryIntrinsic("lg2.approx", null);
         public static final PTXUnaryIntrinsic SIN = new PTXUnaryIntrinsic("sin.approx", null);
         public static final PTXUnaryIntrinsic COS = new PTXUnaryIntrinsic("cos.approx", null);
@@ -571,13 +574,12 @@ public class PTXAssembler extends Assembler {
             public void emit(PTXCompilationResultBuilder crb, Value x, Variable dest) {
                 final PTXAssembler asm = crb.getAssembler();
                 emitOpcode(asm);
-                PTXKind destType = (PTXKind) dest.getPlatformKind();
 
                 PTXKind instructionKind = PTXKind.B32;
                 if (((PTXKind) x.getPlatformKind()).is64Bit()) {
                     instructionKind = PTXKind.B64;
                 }
-                asm.emit("." + instructionKind);
+                asm.emit(STR.".\{instructionKind}" );
 
                 asm.emitSymbol(TAB);
                 asm.emitValues(new Value[] { dest, x });
@@ -621,6 +623,7 @@ public class PTXAssembler extends Assembler {
         public static final PTXBinaryOp MUL_WIDE = new PTXBinaryOp("mul.wide");
         public static final PTXBinaryOp DIV = new PTXBinaryOp("div");
         public static final PTXBinaryOp DIV_FULL = new PTXBinaryOp("div.full", false);
+        public static final PTXBinaryOp DIV_APPROX = new PTXBinaryOp("div.approx", false);
         public static final PTXBinaryOp REM = new PTXBinaryOp("rem", false);
 
         public static final PTXBinaryOp RELATIONAL_EQ = new PTXBinaryOp("==");
@@ -723,6 +726,14 @@ public class PTXAssembler extends Assembler {
         public static final PTXBinaryTemplate NEW_LOCAL_SHORT_ARRAY = new PTXBinaryTemplate("local memory array short", ".local .s16 %s[%s]");
         public static final PTXBinaryTemplate NEW_LOCAL_CHAR_ARRAY = new PTXBinaryTemplate("local memory array char", ".local .u16 %s[%s]");
         public static final PTXBinaryTemplate NEW_LOCAL_BYTE_ARRAY = new PTXBinaryTemplate("local memory array byte", ".local .s8 %s[%s]");
+
+        public static final PTXBinaryTemplate LOCAL_FLOAT_ARRAY_PTR_COPY = new PTXBinaryTemplate("local pointer copy array float", "ld.local.f32 %s, [%s]");
+        public static final PTXBinaryTemplate LOCAL_INT_ARRAY_PTR_COPY = new PTXBinaryTemplate("local pointer copy array int", "ld.local.s32 %s, [%s]");
+        public static final PTXBinaryTemplate LOCAL_DOUBLE_ARRAY_PTR_COPY = new PTXBinaryTemplate("local pointer copy array double", "ld.local.f64 %s, [%s]");
+        public static final PTXBinaryTemplate LOCAL_LONG_ARRAY_PTR_COPY = new PTXBinaryTemplate("local pointer copy array long", "ld.local.s64 %s, [%s]");
+        public static final PTXBinaryTemplate LOCAL_SHORT_ARRAY_PTR_COPY = new PTXBinaryTemplate("local pointer copy array short", "ld.local.s16 %s, [%s]");
+        public static final PTXBinaryTemplate LOCAL_CHAR_ARRAY_PTR_COPY = new PTXBinaryTemplate("local pointer copy array char", "ld.local.u16 %s, [%s]");
+        public static final PTXBinaryTemplate LOCAL_BYTE_ARRAY_PTR_COPY = new PTXBinaryTemplate("local pointer copy array byte", "ld.local.s8 %s, [%s]");
 
         public static final PTXBinaryTemplate NEW_SHARED_FLOAT_ARRAY = new PTXBinaryTemplate("shared memory array float", ".shared .f32 %s[%s]");
         public static final PTXBinaryTemplate NEW_SHARED_INT_ARRAY = new PTXBinaryTemplate("shared memory array int", ".shared .s32 %s[%s]");

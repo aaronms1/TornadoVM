@@ -6,7 +6,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *    http://www.apache.org/licenses/LICENSE-2.0
+ * http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -26,6 +26,8 @@ import uk.ac.manchester.tornado.api.ImmutableTaskGraph;
 import uk.ac.manchester.tornado.api.TaskGraph;
 import uk.ac.manchester.tornado.api.TornadoExecutionPlan;
 import uk.ac.manchester.tornado.api.enums.DataTransferMode;
+import uk.ac.manchester.tornado.api.exceptions.TornadoExecutionPlanException;
+import uk.ac.manchester.tornado.api.types.arrays.DoubleArray;
 import uk.ac.manchester.tornado.unittests.common.TornadoTestBase;
 
 /**
@@ -33,7 +35,7 @@ import uk.ac.manchester.tornado.unittests.common.TornadoTestBase;
  * How to run?
  * </p>
  * <code>
- *      tornado-test -V uk.ac.manchester.tornado.unittests.instances.TestInstances
+ * tornado-test -V uk.ac.manchester.tornado.unittests.instances.TestInstances
  * </code>
  *
  */
@@ -41,50 +43,52 @@ public class TestInstances extends TornadoTestBase {
 
     public static class Foo {
         // Parallel initialisation
-        public void compute(double[] array, double initValue) {
-            for (int i = 0; i < array.length; i++) {
-                array[i] = initValue;
+        public void compute(DoubleArray array, double initValue) {
+            for (int i = 0; i < array.getSize(); i++) {
+                array.set(i, initValue);
             }
         }
     }
 
     @Test
-    public void testInit() {
+    public void testInit() throws TornadoExecutionPlanException {
         Foo f = new Foo();
-        double[] array = new double[1000];
+        DoubleArray array = new DoubleArray(1000);
 
         TaskGraph taskGraph = new TaskGraph("s0") //
                 .task("t0", f::compute, array, 2.1) //
                 .transferToHost(DataTransferMode.EVERY_EXECUTION, array);
 
         ImmutableTaskGraph immutableTaskGraph = taskGraph.snapshot();
-        TornadoExecutionPlan executionPlan = new TornadoExecutionPlan(immutableTaskGraph);
-        executionPlan.execute();
+        try (TornadoExecutionPlan executionPlan = new TornadoExecutionPlan(immutableTaskGraph)) {
+            executionPlan.execute();
+        }
 
-        for (double v : array) {
-            assertEquals(2.1, v, 0.001);
+        for (int i = 0; i < array.getSize(); i++) {
+            assertEquals(2.1, array.get(i), 0.001);
         }
     }
 
-    public void compute(double[] array, double initValue) {
-        for (int i = 0; i < array.length; i++) {
-            array[i] = initValue;
+    public void compute(DoubleArray array, double initValue) {
+        for (int i = 0; i < array.getSize(); i++) {
+            array.set(i, initValue);
         }
     }
 
     @Test
-    public void testThis() {
-        double[] array = new double[1000];
+    public void testThis() throws TornadoExecutionPlanException {
+        DoubleArray array = new DoubleArray(1000);
 
         TaskGraph taskGraph = new TaskGraph("s0") //
                 .task("t0", this::compute, array, 2.1) //
                 .transferToHost(DataTransferMode.EVERY_EXECUTION, array);
         ImmutableTaskGraph immutableTaskGraph = taskGraph.snapshot();
-        TornadoExecutionPlan executionPlan = new TornadoExecutionPlan(immutableTaskGraph);
-        executionPlan.execute();
+        try (TornadoExecutionPlan executionPlan = new TornadoExecutionPlan(immutableTaskGraph)) {
+            executionPlan.execute();
+        }
 
-        for (double v : array) {
-            assertEquals(2.1, v, 0.001);
+        for (int i = 0; i < array.getSize(); i++) {
+            assertEquals(2.1, array.get(i), 0.001);
         }
     }
 }

@@ -2,7 +2,7 @@
  * This file is part of Tornado: A heterogeneous programming framework:
  * https://github.com/beehive-lab/tornadovm
  *
- * Copyright (c) 2021, APT Group, Department of Computer Science,
+ * Copyright (c) 2021, 2024, APT Group, Department of Computer Science,
  * School of Engineering, The University of Manchester. All rights reserved.
  * Copyright (c) 2009-2021, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
@@ -13,7 +13,7 @@
  *
  * This code is distributed in the hope that it will be useful, but WITHOUT
  * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
- * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License
  * version 2 for more details (a copy is included in the LICENSE file that
  * accompanied this code).
  *
@@ -40,7 +40,7 @@ import uk.ac.manchester.tornado.drivers.spirv.graal.compiler.SPIRVLIRGenerator;
 import uk.ac.manchester.tornado.drivers.spirv.graal.lir.SPIRVKind;
 import uk.ac.manchester.tornado.drivers.spirv.graal.lir.SPIRVLIRStmt;
 import uk.ac.manchester.tornado.drivers.spirv.graal.lir.SPIRVUnary;
-import uk.ac.manchester.tornado.runtime.graal.phases.MarkCastNode;
+import uk.ac.manchester.tornado.runtime.graal.nodes.interfaces.MarkCastNode;
 
 @NodeInfo(shortName = "SPIRVCastNode")
 public class CastNode extends FloatingNode implements LIRLowerable, MarkCastNode {
@@ -58,27 +58,16 @@ public class CastNode extends FloatingNode implements LIRLowerable, MarkCastNode
     }
 
     private SPIRVUnary.CastOperations resolveOp(Variable result, LIRKind lirKind, Value value) {
-        switch (op) {
-            case I2F:
-                return new SPIRVUnary.CastIToFloat(lirKind, result, value, SPIRVKind.OP_TYPE_FLOAT_32);
-            case I2D:
-                return new SPIRVUnary.CastIToFloat(lirKind, result, value, SPIRVKind.OP_TYPE_FLOAT_64);
-            case D2F:
-                return new SPIRVUnary.CastFloatDouble(lirKind, result, value, SPIRVKind.OP_TYPE_FLOAT_32);
-            case F2D:
-                return new SPIRVUnary.CastFloatDouble(lirKind, result, value, SPIRVKind.OP_TYPE_FLOAT_64);
-            case L2D:
-                return new SPIRVUnary.CastFloatDouble(lirKind, result, value, SPIRVKind.OP_TYPE_FLOAT_64);
-            case L2F:
-                return new SPIRVUnary.CastFloatToLong(lirKind, result, value, SPIRVKind.OP_TYPE_FLOAT_32);
-            case F2I:
-                return new SPIRVUnary.CastFloatToInt(lirKind, result, value, SPIRVKind.OP_TYPE_INT_32);
-            case D2L:
-            case F2L:
-            case D2I:
-            default:
-                throw new RuntimeException("Conversion Cast Operation unimplemented: " + op);
-        }
+        return switch (op) {
+            case I2F -> new SPIRVUnary.CastIToFloat(lirKind, result, value, SPIRVKind.OP_TYPE_FLOAT_32);
+            case I2D -> new SPIRVUnary.CastIToFloat(lirKind, result, value, SPIRVKind.OP_TYPE_FLOAT_64);
+            case D2F -> new SPIRVUnary.CastFloatDouble(lirKind, result, value, SPIRVKind.OP_TYPE_FLOAT_32);
+            case F2D -> new SPIRVUnary.CastFloatDouble(lirKind, result, value, SPIRVKind.OP_TYPE_FLOAT_64);
+            case L2D -> new SPIRVUnary.CastFloatDouble(lirKind, result, value, SPIRVKind.OP_TYPE_FLOAT_64);
+            case L2F -> new SPIRVUnary.CastFloatToLong(lirKind, result, value, SPIRVKind.OP_TYPE_FLOAT_32);
+            case F2I -> new SPIRVUnary.CastFloatToInt(lirKind, result, value, SPIRVKind.OP_TYPE_INT_32);
+            default -> throw new RuntimeException("Conversion Cast Operation unimplemented: " + op);
+        };
     }
 
     @Override

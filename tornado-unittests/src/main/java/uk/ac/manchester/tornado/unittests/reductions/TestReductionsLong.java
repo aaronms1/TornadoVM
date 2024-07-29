@@ -6,7 +6,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *    http://www.apache.org/licenses/LICENSE-2.0
+ * http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -19,7 +19,6 @@ package uk.ac.manchester.tornado.unittests.reductions;
 
 import static org.junit.Assert.assertEquals;
 
-import java.util.Arrays;
 import java.util.Random;
 import java.util.stream.IntStream;
 
@@ -30,8 +29,10 @@ import uk.ac.manchester.tornado.api.TaskGraph;
 import uk.ac.manchester.tornado.api.TornadoExecutionPlan;
 import uk.ac.manchester.tornado.api.annotations.Parallel;
 import uk.ac.manchester.tornado.api.annotations.Reduce;
-import uk.ac.manchester.tornado.api.collections.math.TornadoMath;
 import uk.ac.manchester.tornado.api.enums.DataTransferMode;
+import uk.ac.manchester.tornado.api.exceptions.TornadoExecutionPlanException;
+import uk.ac.manchester.tornado.api.math.TornadoMath;
+import uk.ac.manchester.tornado.api.types.arrays.LongArray;
 import uk.ac.manchester.tornado.unittests.common.TornadoTestBase;
 
 /**
@@ -39,27 +40,28 @@ import uk.ac.manchester.tornado.unittests.common.TornadoTestBase;
  * How to run?
  * </p>
  * <code>
- *     tornado-test -V uk.ac.manchester.tornado.unittests.reductions.TestReductionsLong
+ * tornado-test -V uk.ac.manchester.tornado.unittests.reductions.TestReductionsLong
  * </code>
  */
 public class TestReductionsLong extends TornadoTestBase {
 
     private static final int SIZE = 4096;
 
-    private static void reductionAnnotation(long[] input, @Reduce long[] result) {
-        result[0] = 0;
-        for (@Parallel int i = 0; i < input.length; i++) {
-            result[0] += input[i];
+    private static void reductionAnnotation(LongArray input, @Reduce LongArray result) {
+        result.set(0, 0);
+        for (@Parallel int i = 0; i < input.getSize(); i++) {
+            result.set(0, result.get(0) + input.get(i));
         }
     }
 
     @Test
-    public void testReductionSum() {
-        long[] input = new long[SIZE];
-        long[] result = new long[] { 0 };
+    public void testReductionSum() throws TornadoExecutionPlanException {
+        LongArray input = new LongArray(SIZE);
+        LongArray result = new LongArray(1);
+        result.init(0);
 
         IntStream.range(0, SIZE).parallel().forEach(i -> {
-            input[i] = 2;
+            input.set(i, 2);
         });
 
         TaskGraph taskGraph = new TaskGraph("s0") //
@@ -68,32 +70,34 @@ public class TestReductionsLong extends TornadoTestBase {
                 .transferToHost(DataTransferMode.EVERY_EXECUTION, result);
 
         ImmutableTaskGraph immutableTaskGraph = taskGraph.snapshot();
-        TornadoExecutionPlan executionPlan = new TornadoExecutionPlan(immutableTaskGraph);
-        executionPlan.execute();
+        try (TornadoExecutionPlan executionPlan = new TornadoExecutionPlan(immutableTaskGraph)) {
+            executionPlan.execute();
+        }
 
-        long[] sequential = new long[1];
+        LongArray sequential = new LongArray(1);
         reductionAnnotation(input, sequential);
 
         // Check result
-        assertEquals(sequential[0], result[0]);
+        assertEquals(sequential.get(0), result.get(0));
     }
 
-    private static void multReductionAnnotation(long[] input, @Reduce long[] result) {
-        for (@Parallel int i = 0; i < input.length; i++) {
-            result[0] *= input[i];
+    private static void multReductionAnnotation(LongArray input, @Reduce LongArray result) {
+        result.set(0, 0);
+        for (@Parallel int i = 0; i < input.getSize(); i++) {
+            result.set(0, result.get(0) * input.get(i));
         }
     }
 
     @Test
-    public void testMultiplicationReduction() {
-        long[] input = new long[64];
-        long[] result = new long[] { 1 };
+    public void testMultiplicationReduction() throws TornadoExecutionPlanException {
+        LongArray input = new LongArray(64);
+        LongArray result = new LongArray(1);
 
-        input[10] = new Random().nextInt(100);
-        input[50] = new Random().nextInt(100);
+        input.set(10, new Random().nextInt(100));
+        input.set(50, new Random().nextInt(100));
 
         final int neutral = 1;
-        Arrays.fill(result, neutral);
+        result.init(neutral);
 
         TaskGraph taskGraph = new TaskGraph("s0") //
                 .transferToDevice(DataTransferMode.EVERY_EXECUTION, input) //
@@ -101,34 +105,36 @@ public class TestReductionsLong extends TornadoTestBase {
                 .transferToHost(DataTransferMode.EVERY_EXECUTION, result);
 
         ImmutableTaskGraph immutableTaskGraph = taskGraph.snapshot();
-        TornadoExecutionPlan executionPlan = new TornadoExecutionPlan(immutableTaskGraph);
-        executionPlan.execute();
+        try (TornadoExecutionPlan executionPlan = new TornadoExecutionPlan(immutableTaskGraph)) {
+            executionPlan.execute();
+        }
 
-        long[] sequential = new long[] { 1 };
+        LongArray sequential = new LongArray(1);
+        sequential.init(0);
         multReductionAnnotation(input, sequential);
 
         // Check result
-        assertEquals(sequential[0], result[0]);
+        assertEquals(sequential.get(0), result.get(0));
     }
 
-    private static void maxReductionAnnotation(long[] input, @Reduce long[] result) {
-        for (@Parallel int i = 0; i < input.length; i++) {
-            result[0] = TornadoMath.max(result[0], input[i]);
+    private static void maxReductionAnnotation(LongArray input, @Reduce LongArray result) {
+        result.set(0, 0);
+        for (@Parallel int i = 0; i < input.getSize(); i++) {
+            result.set(0, TornadoMath.max(result.get(0), input.get(i)));
         }
     }
 
     @Test
-    public void testMaxReduction() {
-        long[] input = new long[SIZE];
+    public void testMaxReduction() throws TornadoExecutionPlanException {
+        LongArray input = new LongArray(SIZE);
 
         Random r = new Random();
         IntStream.range(0, SIZE).forEach(idx -> {
-            input[idx] = r.nextInt(10000);
+            input.set(idx, r.nextInt(10000));
         });
 
-        long[] result = new long[1];
-
-        Arrays.fill(result, Long.MIN_VALUE);
+        LongArray result = new LongArray(1);
+        result.init(Long.MIN_VALUE);
 
         TaskGraph taskGraph = new TaskGraph("s0") //
                 .transferToDevice(DataTransferMode.EVERY_EXECUTION, input) //
@@ -136,58 +142,62 @@ public class TestReductionsLong extends TornadoTestBase {
                 .transferToHost(DataTransferMode.EVERY_EXECUTION, result);
 
         ImmutableTaskGraph immutableTaskGraph = taskGraph.snapshot();
-        TornadoExecutionPlan executionPlan = new TornadoExecutionPlan(immutableTaskGraph);
-        executionPlan.execute();
+        try (TornadoExecutionPlan executionPlan = new TornadoExecutionPlan(immutableTaskGraph)) {
+            executionPlan.execute();
+        }
 
-        long[] sequential = new long[1];
+        LongArray sequential = new LongArray(1);
         maxReductionAnnotation(input, sequential);
 
-        assertEquals(sequential[0], result[0]);
+        assertEquals(sequential.get(0), result.get(0));
     }
 
-    private static void minReductionAnnotation(long[] input, @Reduce long[] result) {
-        for (@Parallel int i = 0; i < input.length; i++) {
-            result[0] = TornadoMath.min(result[0], input[i]);
+    private static void minReductionAnnotation(LongArray input, @Reduce LongArray result) {
+        result.set(0, 0);
+        for (@Parallel int i = 0; i < input.getSize(); i++) {
+            result.set(0, TornadoMath.min(result.get(0), input.get(i)));
         }
     }
 
     @Test
-    public void testMinReduction() {
-        long[] input = new long[SIZE];
+    public void testMinReduction() throws TornadoExecutionPlanException {
+        LongArray input = new LongArray(SIZE);
         IntStream.range(0, SIZE).forEach(idx -> {
-            input[idx] = idx + 1;
+            input.set(idx, idx + 1);
         });
 
-        long[] result = new long[1];
-        Arrays.fill(result, Integer.MAX_VALUE);
+        LongArray result = new LongArray(1);
+        result.init(Integer.MAX_VALUE);
 
         TaskGraph taskGraph = new TaskGraph("s0") //
                 .transferToDevice(DataTransferMode.FIRST_EXECUTION, input) //
                 .task("t0", TestReductionsLong::minReductionAnnotation, input, result) //
                 .transferToHost(DataTransferMode.EVERY_EXECUTION, result);
         ImmutableTaskGraph immutableTaskGraph = taskGraph.snapshot();
-        TornadoExecutionPlan executionPlan = new TornadoExecutionPlan(immutableTaskGraph);
-        executionPlan.execute();
+        try (TornadoExecutionPlan executionPlan = new TornadoExecutionPlan(immutableTaskGraph)) {
+            executionPlan.execute();
+        }
 
-        long[] sequential = new long[] { Long.MAX_VALUE };
+        LongArray sequential = new LongArray(1);
+        sequential.init(Long.MAX_VALUE);
         minReductionAnnotation(input, sequential);
 
-        assertEquals(sequential[0], result[0]);
+        assertEquals(sequential.get(0), result.get(0));
     }
 
-    private static void maxReductionAnnotation2(long[] input, @Reduce long[] result) {
-        result[0] = Long.MIN_VALUE + 1;
-        for (@Parallel int i = 0; i < input.length; i++) {
-            result[0] = TornadoMath.max(result[0], input[i] * 2);
+    private static void maxReductionAnnotation2(LongArray input, @Reduce LongArray result) {
+        result.set(0, Long.MIN_VALUE + 1);
+        for (@Parallel int i = 0; i < input.getSize(); i++) {
+            result.set(0, TornadoMath.max(result.get(0), input.get(i) * 2));
         }
     }
 
     @Test
-    public void testMaxReduction2() {
-        long[] input = new long[SIZE];
-        long[] result = new long[1];
+    public void testMaxReduction2() throws TornadoExecutionPlanException {
+        LongArray input = new LongArray(SIZE);
+        LongArray result = new LongArray(1);
         IntStream.range(0, SIZE).forEach(idx -> {
-            input[idx] = idx;
+            input.set(idx, idx);
         });
 
         long neutral = Long.MIN_VALUE;
@@ -198,27 +208,30 @@ public class TestReductionsLong extends TornadoTestBase {
                 .transferToHost(DataTransferMode.EVERY_EXECUTION, result);
 
         ImmutableTaskGraph immutableTaskGraph = taskGraph.snapshot();
-        TornadoExecutionPlan executionPlan = new TornadoExecutionPlan(immutableTaskGraph);
-        executionPlan.execute();
+        try (TornadoExecutionPlan executionPlan = new TornadoExecutionPlan(immutableTaskGraph)) {
+            executionPlan.execute();
+        }
 
-        long[] sequential = new long[] { neutral };
+        LongArray sequential = new LongArray(1);
+        sequential.init(neutral);
         maxReductionAnnotation2(input, sequential);
-        assertEquals(sequential[0], result[0]);
+        assertEquals(sequential.get(0), result.get(0));
     }
 
-    private static void minReductionAnnotation2(long[] input, @Reduce long[] result) {
-        for (@Parallel int i = 0; i < input.length; i++) {
-            result[0] = TornadoMath.min(result[0], input[i] * 50);
+    private static void minReductionAnnotation2(LongArray input, @Reduce LongArray result) {
+        result.set(0, 0);
+        for (@Parallel int i = 0; i < input.getSize(); i++) {
+            result.set(0, TornadoMath.min(result.get(0), input.get(i) * 50));
         }
     }
 
     @Test
-    public void testMinReduction2() {
-        long[] input = new long[SIZE];
-        long[] result = new long[1];
+    public void testMinReduction2() throws TornadoExecutionPlanException {
+        LongArray input = new LongArray(SIZE);
+        LongArray result = new LongArray(1);
 
         IntStream.range(0, SIZE).parallel().forEach(idx -> {
-            input[idx] = 100;
+            input.set(idx, 100);
         });
 
         TaskGraph taskGraph = new TaskGraph("s0") //
@@ -227,13 +240,14 @@ public class TestReductionsLong extends TornadoTestBase {
                 .transferToHost(DataTransferMode.EVERY_EXECUTION, result);
 
         ImmutableTaskGraph immutableTaskGraph = taskGraph.snapshot();
-        TornadoExecutionPlan executionPlan = new TornadoExecutionPlan(immutableTaskGraph);
-        executionPlan.execute();
+        try (TornadoExecutionPlan executionPlan = new TornadoExecutionPlan(immutableTaskGraph)) {
+            executionPlan.execute();
+        }
 
-        long[] sequential = new long[1];
+        LongArray sequential = new LongArray(1);
         minReductionAnnotation2(input, sequential);
 
-        assertEquals(sequential[0], result[0]);
+        assertEquals(sequential.get(0), result.get(0));
     }
 
 }

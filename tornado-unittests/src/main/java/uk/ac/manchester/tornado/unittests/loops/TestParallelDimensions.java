@@ -6,7 +6,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *    http://www.apache.org/licenses/LICENSE-2.0
+ * http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -19,8 +19,6 @@ package uk.ac.manchester.tornado.unittests.loops;
 
 import static org.junit.Assert.assertEquals;
 
-import java.util.Arrays;
-
 import org.junit.Test;
 
 import uk.ac.manchester.tornado.api.ImmutableTaskGraph;
@@ -28,6 +26,8 @@ import uk.ac.manchester.tornado.api.TaskGraph;
 import uk.ac.manchester.tornado.api.TornadoExecutionPlan;
 import uk.ac.manchester.tornado.api.annotations.Parallel;
 import uk.ac.manchester.tornado.api.enums.DataTransferMode;
+import uk.ac.manchester.tornado.api.exceptions.TornadoExecutionPlanException;
+import uk.ac.manchester.tornado.api.types.arrays.IntArray;
 import uk.ac.manchester.tornado.unittests.common.TornadoTestBase;
 
 /**
@@ -35,133 +35,137 @@ import uk.ac.manchester.tornado.unittests.common.TornadoTestBase;
  * How to run?
  * </p>
  * <code>
- *     tornado-test -V uk.ac.manchester.tornado.unittests.loops.TestParallelDimensions
+ * tornado-test -V uk.ac.manchester.tornado.unittests.loops.TestParallelDimensions
  * </code>
  */
 public class TestParallelDimensions extends TornadoTestBase {
 
-    public static void forLoopOneD(int[] a) {
-        for (@Parallel int i = 0; i < a.length; i++) {
-            a[i] = 10;
+    public static void forLoopOneD(IntArray a) {
+        for (@Parallel int i = 0; i < a.getSize(); i++) {
+            a.set(i, 10);
         }
     }
 
     @Test
-    public void test1DParallel() {
+    public void test1DParallel() throws TornadoExecutionPlanException {
         final int size = 128;
 
-        int[] a = new int[size];
+        IntArray a = new IntArray(size);
 
-        Arrays.fill(a, 1);
+        a.init(1);
 
         TaskGraph taskGraph = new TaskGraph("s0") //
                 .task("t0", TestParallelDimensions::forLoopOneD, a) //
                 .transferToHost(DataTransferMode.EVERY_EXECUTION, a);
         ImmutableTaskGraph immutableTaskGraph = taskGraph.snapshot();
-        TornadoExecutionPlan executionPlan = new TornadoExecutionPlan(immutableTaskGraph);
-        executionPlan.execute();
+        try (TornadoExecutionPlan executionPlan = new TornadoExecutionPlan(immutableTaskGraph)) {
+            executionPlan.execute();
+        }
 
-        for (int j : a) {
-            assertEquals(10, j);
+        for (int i = 0; i < a.getSize(); i++) {
+            assertEquals(10, a.get(i));
         }
 
     }
 
-    public static void forLoop2D(int[] a, int size) {
+    public static void forLoop2D(IntArray a, int size) {
         for (@Parallel int i = 0; i < size; i++) {
             for (@Parallel int j = 0; j < size; j++) {
-                a[i * size + j] = 10;
+                a.set(i * size + j, 10);
             }
         }
     }
 
     @Test
-    public void test2DParallel() {
+    public void test2DParallel() throws TornadoExecutionPlanException {
         final int size = 128;
 
-        int[] a = new int[size * size];
-        Arrays.fill(a, 1);
+        IntArray a = new IntArray(size * size);
+        a.init(1);
 
         TaskGraph taskGraph = new TaskGraph("s0") //
                 .task("t0", TestParallelDimensions::forLoop2D, a, size) //
                 .transferToHost(DataTransferMode.EVERY_EXECUTION, a);
         ImmutableTaskGraph immutableTaskGraph = taskGraph.snapshot();
-        TornadoExecutionPlan executionPlan = new TornadoExecutionPlan(immutableTaskGraph);
-        executionPlan.execute();
+        try (TornadoExecutionPlan executionPlan = new TornadoExecutionPlan(immutableTaskGraph)) {
+            executionPlan.execute();
+        }
 
         for (int i = 0; i < size; i++) {
             for (int j = 0; j < size; j++) {
-                assertEquals(10, a[i * size + j]);
+                assertEquals(10, a.get(i * size + j));
             }
         }
     }
 
-    public static void forLoop3D(int[] a, int size) {
+    public static void forLoop3D(IntArray a, int size) {
         for (@Parallel int i = 0; i < size; i++) {
             for (@Parallel int j = 0; j < size; j++) {
                 for (@Parallel int y = 0; y < size; y++) {
-                    a[(size * size * y) + (size * j) + i] = 10;
+                    a.set((size * size * y) + (size * j) + i, 10);
                 }
             }
         }
     }
 
     @Test
-    public void test3DParallel() {
+    public void test3DParallel() throws TornadoExecutionPlanException {
         final int size = 128;
 
-        int[] a = new int[size * size * size];
-        Arrays.fill(a, 1);
+        IntArray a = new IntArray(size * size * size);
+        a.init(1);
 
         TaskGraph taskGraph = new TaskGraph("s0") //
                 .task("t0", TestParallelDimensions::forLoop3D, a, size) //
                 .transferToHost(DataTransferMode.EVERY_EXECUTION, a);
         ImmutableTaskGraph immutableTaskGraph = taskGraph.snapshot();
-        TornadoExecutionPlan executionPlan = new TornadoExecutionPlan(immutableTaskGraph);
-        executionPlan.execute();
+        try (TornadoExecutionPlan executionPlan = new TornadoExecutionPlan(immutableTaskGraph)) {
+            executionPlan.execute();
+        }
 
         for (int i = 0; i < size; i++) {
             for (int j = 0; j < size; j++) {
                 for (int y = 0; y < size; y++) {
-                    assertEquals(10, a[(size * size * y) + (size * j) + i]);
+                    assertEquals(10, a.get((size * size * y) + (size * j) + i));
                 }
             }
         }
     }
 
-    public static void forLoop3DMap(int[] a, int[] b, int size) {
+    public static void forLoop3DMap(IntArray a, IntArray b, int size) {
         for (@Parallel int i = 0; i < size; i++) {
             for (@Parallel int j = 0; j < size; j++) {
                 for (@Parallel int y = 0; y < size; y++) {
                     int threeDindex = (size * size * y) + (size * j) + i;
-                    a[threeDindex] = b[threeDindex];
+                    a.set(threeDindex, b.get(threeDindex));
                 }
             }
         }
     }
 
     @Test
-    public void test3DParallelMap() {
+    public void test3DParallelMap() throws TornadoExecutionPlanException {
         final int size = 128;
 
-        int[] a = new int[size * size * size];
-        int[] b = new int[size * size * size];
+        IntArray a = new IntArray(size * size * size);
+        IntArray b = new IntArray(size * size * size);
 
-        Arrays.fill(a, 1);
-        Arrays.fill(b, 110);
+        a.init(1);
+        b.init(110);
 
         TaskGraph taskGraph = new TaskGraph("s0") //
                 .transferToDevice(DataTransferMode.FIRST_EXECUTION, b) //
                 .task("t0", TestParallelDimensions::forLoop3DMap, a, b, size) //
                 .transferToHost(DataTransferMode.EVERY_EXECUTION, a);
         ImmutableTaskGraph immutableTaskGraph = taskGraph.snapshot();
-        TornadoExecutionPlan executionPlan = new TornadoExecutionPlan(immutableTaskGraph);
-        executionPlan.execute();
+        try (TornadoExecutionPlan executionPlan = new TornadoExecutionPlan(immutableTaskGraph)) {
+            executionPlan.execute();
+        }
 
         for (int i = 0; i < size; i++) {
             for (int j = 0; j < size; j++) {
                 for (int y = 0; y < size; y++) {
-                    assertEquals(110, a[(size * size * y) + (size * j) + i]);
+                    assertEquals(110, a.get((size * size * y) + (size * j) + i));
                 }
             }
         }

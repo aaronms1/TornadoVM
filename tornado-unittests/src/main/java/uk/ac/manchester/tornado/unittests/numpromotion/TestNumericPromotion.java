@@ -6,7 +6,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *    http://www.apache.org/licenses/LICENSE-2.0
+ * http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -27,6 +27,8 @@ import uk.ac.manchester.tornado.api.TaskGraph;
 import uk.ac.manchester.tornado.api.TornadoExecutionPlan;
 import uk.ac.manchester.tornado.api.enums.DataTransferMode;
 import uk.ac.manchester.tornado.api.enums.TornadoVMBackendType;
+import uk.ac.manchester.tornado.api.exceptions.TornadoExecutionPlanException;
+import uk.ac.manchester.tornado.api.types.arrays.ByteArray;
 import uk.ac.manchester.tornado.unittests.common.TornadoTestBase;
 
 /**
@@ -50,104 +52,105 @@ import uk.ac.manchester.tornado.unittests.common.TornadoTestBase;
  * How to run?
  * </p>
  * <code>
- *     tornado-test -V uk.ac.manchester.tornado.unittests.numpromotion.TestNumericPromotion
+ * tornado-test -V uk.ac.manchester.tornado.unittests.numpromotion.TestNumericPromotion
  * </code>
  */
 
 public class TestNumericPromotion extends TornadoTestBase {
 
-    public static void bitwiseOr(byte[] result, byte[] input, byte[] elements) {
+    public static void bitwiseOr(ByteArray result, ByteArray input, ByteArray elements) {
         for (int i = 0; i < 2; i++) {
-            for (int j = 0; j < elements[0]; j++) {
-                result[j] |= input[(i * elements[0]) + j];
+            for (int j = 0; j < elements.get(0); j++) {
+                result.set(j, (byte) (result.get(j) | input.get((i * elements.get(0)) + j)));
             }
         }
     }
 
-    public static void bitwiseAnd(byte[] result, byte[] input, byte[] elements) {
+    public static void bitwiseAnd(ByteArray result, ByteArray input, ByteArray elements) {
         for (int i = 0; i < 2; i++) {
-            for (int j = 0; j < elements[0]; j++) {
-                result[j] &= input[(i * elements[0]) + j];
+            for (int j = 0; j < elements.get(0); j++) {
+                result.set(j, (byte) (result.get(j) & input.get((i * elements.get(0)) + j)));
             }
         }
     }
 
-    public static void bitwiseXor(byte[] result, byte[] input, byte[] elements) {
+    public static void bitwiseXor(ByteArray result, ByteArray input, ByteArray elements) {
         for (int i = 0; i < 2; i++) {
-            for (int j = 0; j < elements[0]; j++) {
-                result[j] ^= input[(i * elements[0]) + j];
+            for (int j = 0; j < elements.get(0); j++) {
+                result.set(j, (byte) (result.get(j) ^ input.get((i * elements.get(0)) + j)));
             }
         }
     }
 
-    public static void bitwiseNot(byte[] result, byte[] input) {
-        for (int i = 0; i < input.length; i++) {
-            result[i] = (byte) ~input[i];
+    public static void bitwiseNot(ByteArray result, ByteArray input) {
+        for (int i = 0; i < input.getSize(); i++) {
+            result.set(i, (byte) ~input.get(i));
         }
     }
 
-    public static void addition(byte[] result, byte[] input, byte[] elements) {
+    public static void addition(ByteArray result, ByteArray input, ByteArray elements) {
         for (int i = 0; i < 2; i++) {
-            for (int j = 0; j < elements[0]; j++) {
-                result[j] += input[(i * elements[0]) + j];
+            for (int j = 0; j < elements.get(0); j++) {
+                result.set(j, (byte) (result.get(j) + input.get((i * elements.get(0)) + j)));
             }
         }
     }
 
-    public static void subtraction(byte[] result, byte[] input, byte[] elements) {
+    public static void subtraction(ByteArray result, ByteArray input, ByteArray elements) {
         for (int i = 0; i < 2; i++) {
-            for (int j = 0; j < elements[0]; j++) {
-                result[j] -= input[(i * elements[0]) + j];
+            for (int j = 0; j < elements.get(0); j++) {
+                result.set(j, (byte) (result.get(j) - input.get((i * elements.get(0)) + j)));
             }
         }
     }
 
-    public static void multiplication(byte[] result, byte[] input, byte[] elements) {
+    public static void multiplication(ByteArray result, ByteArray input, ByteArray elements) {
         for (int i = 0; i < 2; i++) {
-            for (int j = 0; j < elements[0]; j++) {
-                result[j] *= input[(i * elements[0]) + j];
+            for (int j = 0; j < elements.get(0); j++) {
+                result.set(j, (byte) (result.get(j) * input.get((i * elements.get(0)) + j)));
             }
         }
     }
 
-    public static void division(byte[] result, byte[] input, byte[] elements) {
+    public static void division(ByteArray result, ByteArray input, ByteArray elements) {
         for (int i = 0; i < 2; i++) {
-            for (int j = 0; j < elements[0]; j++) {
-                result[j] /= input[(i * elements[0]) + j];
+            for (int j = 0; j < elements.get(0); j++) {
+                result.set(j, (byte) (result.get(j) / input.get((i * elements.get(0)) + j)));
             }
         }
     }
 
-    public static void signedLeftShift(byte[] result, byte[] input, byte[] elements) {
+    public static void signedLeftShift(ByteArray result, ByteArray input, ByteArray elements) {
         for (int i = 0; i < 2; i++) {
-            for (int j = 0; j < elements[0]; j++) {
-                result[j] <<= input[(i * elements[0]) + j];
+            for (int j = 0; j < elements.get(0); j++) {
+                result.set(j, (byte) (result.get(j) << input.get((i * elements.get(0)) + j)));
             }
         }
     }
 
-    public static void signedRightShift(byte[] result, byte[] input, byte[] elements) {
+    public static void signedRightShift(ByteArray result, ByteArray input, ByteArray elements) {
         for (int i = 0; i < 2; i++) {
-            for (int j = 0; j < elements[0]; j++) {
-                result[j] >>= input[(i * elements[0]) + j];
+            for (int j = 0; j < elements.get(0); j++) {
+                result.set(j, (byte) (result.get(j) >> input.get((i * elements.get(0)) + j)));
             }
         }
     }
 
-    public static void unsignedRightShift(byte[] result, byte[] input, byte[] elements) {
+    public static void unsignedRightShift(ByteArray result, ByteArray input, ByteArray elements) {
         for (int i = 0; i < 2; i++) {
-            for (int j = 0; j < elements[0]; j++) {
-                result[j] >>>= input[(i * elements[0]) + j];
+            for (int j = 0; j < elements.get(0); j++) {
+                result.set(j, (byte) (result.get(j) >>> input.get((i * elements.get(0)) + j)));
             }
         }
     }
 
     @Test
-    public void testBitwiseOr() {
+    public void testBitwiseOr() throws TornadoExecutionPlanException {
 
-        byte[] elements = new byte[] { 4 };
-        byte[] result = new byte[4];
-        byte[] input = new byte[] { 127, 127, 127, 127, 1, 1, 1, 1 };
+        ByteArray elements = new ByteArray(1);
+        elements.init((byte) 4);
+        ByteArray result = new ByteArray(4);
+        ByteArray input = ByteArray.fromElements((byte) 127, (byte) 127, (byte) 127, (byte) 127, (byte) 1, (byte) 1, (byte) 1, (byte) 1);
 
         TaskGraph taskGraph = new TaskGraph("s0") //
                 .transferToDevice(DataTransferMode.EVERY_EXECUTION, result, input, elements) //
@@ -155,22 +158,24 @@ public class TestNumericPromotion extends TornadoTestBase {
                 .transferToHost(DataTransferMode.EVERY_EXECUTION, result);
 
         ImmutableTaskGraph immutableTaskGraph = taskGraph.snapshot();
-        TornadoExecutionPlan executionPlan = new TornadoExecutionPlan(immutableTaskGraph);
-        executionPlan.execute();
+        try (TornadoExecutionPlan executionPlan = new TornadoExecutionPlan(immutableTaskGraph)) {
+            executionPlan.execute();
+        }
 
-        byte[] sequential = new byte[4];
+        ByteArray sequential = new ByteArray(4);
         bitwiseOr(sequential, input, elements);
-        for (int i = 0; i < result.length; i++) {
-            assertEquals(sequential[i], result[i]);
+        for (int i = 0; i < result.getSize(); i++) {
+            assertEquals(sequential.get(i), result.get(i));
         }
     }
 
     @Test
-    public void testBitwiseAnd() {
+    public void testBitwiseAnd() throws TornadoExecutionPlanException {
 
-        byte[] elements = new byte[] { 4 };
-        byte[] result = new byte[4];
-        byte[] input = new byte[] { 127, 127, 127, 127, 1, 1, 1, 1 };
+        ByteArray elements = new ByteArray(1);
+        elements.init((byte) 4);
+        ByteArray result = new ByteArray(4);
+        ByteArray input = ByteArray.fromElements((byte) 127, (byte) 127, (byte) 127, (byte) 127, (byte) 1, (byte) 1, (byte) 1, (byte) 1);
 
         TaskGraph taskGraph = new TaskGraph("s0")//
                 .transferToDevice(DataTransferMode.EVERY_EXECUTION, result, input, elements)//
@@ -178,22 +183,24 @@ public class TestNumericPromotion extends TornadoTestBase {
                 .transferToHost(DataTransferMode.EVERY_EXECUTION, result);
 
         ImmutableTaskGraph immutableTaskGraph = taskGraph.snapshot();
-        TornadoExecutionPlan executionPlan = new TornadoExecutionPlan(immutableTaskGraph);
-        executionPlan.execute();
+        try (TornadoExecutionPlan executionPlan = new TornadoExecutionPlan(immutableTaskGraph)) {
+            executionPlan.execute();
+        }
 
-        byte[] sequential = new byte[4];
+        ByteArray sequential = new ByteArray(4);
         bitwiseAnd(sequential, input, elements);
-        for (int i = 0; i < result.length; i++) {
-            assertEquals(sequential[i], result[i]);
+        for (int i = 0; i < result.getSize(); i++) {
+            assertEquals(sequential.get(i), result.get(i));
         }
     }
 
     @Test
-    public void testBitwiseXor() {
+    public void testBitwiseXor() throws TornadoExecutionPlanException {
 
-        byte[] elements = new byte[] { 4 };
-        byte[] result = new byte[4];
-        byte[] input = new byte[] { 127, 127, 127, 127, 1, 1, 1, 1 };
+        ByteArray elements = new ByteArray(1);
+        elements.init((byte) 4);
+        ByteArray result = new ByteArray(4);
+        ByteArray input = ByteArray.fromElements((byte) 127, (byte) 127, (byte) 127, (byte) 127, (byte) 1, (byte) 1, (byte) 1, (byte) 1);
 
         TaskGraph taskGraph = new TaskGraph("s0")//
                 .transferToDevice(DataTransferMode.EVERY_EXECUTION, result, input, elements)//
@@ -201,23 +208,24 @@ public class TestNumericPromotion extends TornadoTestBase {
                 .transferToHost(DataTransferMode.EVERY_EXECUTION, result);
 
         ImmutableTaskGraph immutableTaskGraph = taskGraph.snapshot();
-        TornadoExecutionPlan executionPlan = new TornadoExecutionPlan(immutableTaskGraph);
-        executionPlan.execute();
+        try (TornadoExecutionPlan executionPlan = new TornadoExecutionPlan(immutableTaskGraph)) {
+            executionPlan.execute();
+        }
 
-        byte[] sequential = new byte[4];
+        ByteArray sequential = new ByteArray(4);
         bitwiseXor(sequential, input, elements);
-        for (int i = 0; i < result.length; i++) {
-            assertEquals(sequential[i], result[i]);
+        for (int i = 0; i < result.getSize(); i++) {
+            assertEquals(sequential.get(i), result.get(i));
         }
     }
 
     @Test
-    public void testBitwiseNot() {
+    public void testBitwiseNot() throws TornadoExecutionPlanException {
         assertNotBackend(TornadoVMBackendType.PTX);
         assertNotBackend(TornadoVMBackendType.SPIRV);
 
-        byte[] result = new byte[8];
-        byte[] input = new byte[] { 0, 0, 127, -127, 1, -1, 1, 1 };
+        ByteArray result = new ByteArray(8);
+        ByteArray input = ByteArray.fromElements((byte) 0, (byte) 0, (byte) 127, (byte) -127, (byte) 1, (byte) -1, (byte) 1, (byte) 1);
 
         TaskGraph taskGraph = new TaskGraph("s0")//
                 .transferToDevice(DataTransferMode.EVERY_EXECUTION, input)//
@@ -225,22 +233,24 @@ public class TestNumericPromotion extends TornadoTestBase {
                 .transferToHost(DataTransferMode.EVERY_EXECUTION, result);
 
         ImmutableTaskGraph immutableTaskGraph = taskGraph.snapshot();
-        TornadoExecutionPlan executionPlan = new TornadoExecutionPlan(immutableTaskGraph);
-        executionPlan.execute();
+        try (TornadoExecutionPlan executionPlan = new TornadoExecutionPlan(immutableTaskGraph)) {
+            executionPlan.execute();
+        }
 
-        byte[] sequential = new byte[8];
+        ByteArray sequential = new ByteArray(8);
         bitwiseNot(sequential, input);
-        for (int i = 0; i < result.length; i++) {
-            assertEquals(sequential[i], result[i]);
+        for (int i = 0; i < result.getSize(); i++) {
+            assertEquals(sequential.get(i), result.get(i));
         }
     }
 
     @Test
-    public void testAddition() {
+    public void testAddition() throws TornadoExecutionPlanException {
 
-        byte[] elements = new byte[] { 4 };
-        byte[] result = new byte[4];
-        byte[] input = new byte[] { 125, 125, 125, 125, 1, 1, 1, 1 };
+        ByteArray elements = new ByteArray(1);
+        elements.init((byte) 4);
+        ByteArray result = new ByteArray(4);
+        ByteArray input = ByteArray.fromElements((byte) 127, (byte) 127, (byte) 127, (byte) 127, (byte) 1, (byte) 1, (byte) 1, (byte) 1);
 
         TaskGraph taskGraph = new TaskGraph("s0")//
                 .transferToDevice(DataTransferMode.EVERY_EXECUTION, result, input, elements)//
@@ -248,22 +258,24 @@ public class TestNumericPromotion extends TornadoTestBase {
                 .transferToHost(DataTransferMode.EVERY_EXECUTION, result);
 
         ImmutableTaskGraph immutableTaskGraph = taskGraph.snapshot();
-        TornadoExecutionPlan executionPlan = new TornadoExecutionPlan(immutableTaskGraph);
-        executionPlan.execute();
+        try (TornadoExecutionPlan executionPlan = new TornadoExecutionPlan(immutableTaskGraph)) {
+            executionPlan.execute();
+        }
 
-        byte[] sequential = new byte[4];
+        ByteArray sequential = new ByteArray(4);
         addition(sequential, input, elements);
-        for (int i = 0; i < result.length; i++) {
-            assertEquals(sequential[i], result[i]);
+        for (int i = 0; i < result.getSize(); i++) {
+            assertEquals(sequential.get(i), result.get(i));
         }
     }
 
     @Test
-    public void testSubtraction() {
+    public void testSubtraction() throws TornadoExecutionPlanException {
 
-        byte[] elements = new byte[] { 4 };
-        byte[] result = new byte[4];
-        byte[] input = new byte[] { 125, 125, 125, 125, 1, 1, 1, 1 };
+        ByteArray elements = new ByteArray(1);
+        elements.init((byte) 4);
+        ByteArray result = new ByteArray(4);
+        ByteArray input = ByteArray.fromElements((byte) 125, (byte) 125, (byte) 125, (byte) 125, (byte) 1, (byte) 1, (byte) 1, (byte) 1);
 
         TaskGraph taskGraph = new TaskGraph("s0")//
                 .transferToDevice(DataTransferMode.EVERY_EXECUTION, result, input, elements)//
@@ -271,22 +283,25 @@ public class TestNumericPromotion extends TornadoTestBase {
                 .transferToHost(DataTransferMode.EVERY_EXECUTION, result);
 
         ImmutableTaskGraph immutableTaskGraph = taskGraph.snapshot();
-        TornadoExecutionPlan executionPlan = new TornadoExecutionPlan(immutableTaskGraph);
-        executionPlan.execute();
+        try (TornadoExecutionPlan executionPlan = new TornadoExecutionPlan(immutableTaskGraph)) {
+            executionPlan.execute();
+        }
 
-        byte[] sequential = new byte[4];
+        ByteArray sequential = new ByteArray(4);
         subtraction(sequential, input, elements);
-        for (int i = 0; i < result.length; i++) {
-            assertEquals(sequential[i], result[i]);
+        for (int i = 0; i < result.getSize(); i++) {
+            assertEquals(sequential.get(i), result.get(i));
         }
     }
 
     @Test
-    public void testMultiplication() {
+    public void testMultiplication() throws TornadoExecutionPlanException {
 
-        byte[] elements = new byte[] { 4 };
-        byte[] result = new byte[] { 1, 1, 1, 1 };
-        byte[] input = new byte[] { 125, 125, 125, 125, 1, 1, 1, 1 };
+        ByteArray elements = new ByteArray(1);
+        elements.init((byte) 4);
+        ByteArray result = new ByteArray(4);
+        result.init((byte) 1);
+        ByteArray input = ByteArray.fromElements((byte) 125, (byte) 125, (byte) 125, (byte) 125, (byte) 1, (byte) 1, (byte) 1, (byte) 1);
 
         TaskGraph taskGraph = new TaskGraph("s0")//
                 .transferToDevice(DataTransferMode.EVERY_EXECUTION, result, input, elements)//
@@ -294,22 +309,26 @@ public class TestNumericPromotion extends TornadoTestBase {
                 .transferToHost(DataTransferMode.EVERY_EXECUTION, result);
 
         ImmutableTaskGraph immutableTaskGraph = taskGraph.snapshot();
-        TornadoExecutionPlan executionPlan = new TornadoExecutionPlan(immutableTaskGraph);
-        executionPlan.execute();
+        try (TornadoExecutionPlan executionPlan = new TornadoExecutionPlan(immutableTaskGraph)) {
+            executionPlan.execute();
+        }
 
-        byte[] sequential = new byte[] { 1, 1, 1, 1 };
+        ByteArray sequential = new ByteArray(4);
+        sequential.init((byte) 1);
         multiplication(sequential, input, elements);
-        for (int i = 0; i < result.length; i++) {
-            assertEquals(sequential[i], result[i]);
+        for (int i = 0; i < result.getSize(); i++) {
+            assertEquals(sequential.get(i), result.get(i));
         }
     }
 
     @Test
-    public void testDivision() {
+    public void testDivision() throws TornadoExecutionPlanException {
 
-        byte[] elements = new byte[] { 4 };
-        byte[] result = new byte[] { 8, 8, 8, 8 };
-        byte[] input = new byte[] { 2, 2, 2, 2, 1, 1, 1, 1 };
+        ByteArray elements = new ByteArray(1);
+        elements.init((byte) 4);
+        ByteArray result = new ByteArray(4);
+        result.init((byte) 8);
+        ByteArray input = ByteArray.fromElements((byte) 2, (byte) 2, (byte) 2, (byte) 2, (byte) 1, (byte) 1, (byte) 1, (byte) 1);
 
         TaskGraph taskGraph = new TaskGraph("s0")//
                 .transferToDevice(DataTransferMode.EVERY_EXECUTION, result, input, elements)//
@@ -317,22 +336,26 @@ public class TestNumericPromotion extends TornadoTestBase {
                 .transferToHost(DataTransferMode.EVERY_EXECUTION, result);
 
         ImmutableTaskGraph immutableTaskGraph = taskGraph.snapshot();
-        TornadoExecutionPlan executionPlan = new TornadoExecutionPlan(immutableTaskGraph);
-        executionPlan.execute();
+        try (TornadoExecutionPlan executionPlan = new TornadoExecutionPlan(immutableTaskGraph)) {
+            executionPlan.execute();
+        }
 
-        byte[] sequential = new byte[] { 8, 8, 8, 8 };
+        ByteArray sequential = new ByteArray(4);
+        sequential.init((byte) 8);
         division(sequential, input, elements);
-        for (int i = 0; i < result.length; i++) {
-            assertEquals(sequential[i], result[i]);
+        for (int i = 0; i < result.getSize(); i++) {
+            assertEquals(sequential.get(i), result.get(i));
         }
     }
 
     @Test
-    public void testSignedLeftShift() {
+    public void testSignedLeftShift() throws TornadoExecutionPlanException {
 
-        byte[] elements = new byte[] { 4 };
-        byte[] result = new byte[] { 8, 8, 8, 8 };
-        byte[] input = new byte[] { 2, 2, 2, 2, 1, 1, 1, 1 };
+        ByteArray elements = new ByteArray(1);
+        elements.init((byte) 4);
+        ByteArray result = new ByteArray(4);
+        result.init((byte) 8);
+        ByteArray input = ByteArray.fromElements((byte) 2, (byte) 2, (byte) 2, (byte) 2, (byte) 1, (byte) 1, (byte) 1, (byte) 1);
 
         TaskGraph taskGraph = new TaskGraph("s0")//
                 .transferToDevice(DataTransferMode.EVERY_EXECUTION, result, input, elements)//
@@ -340,22 +363,26 @@ public class TestNumericPromotion extends TornadoTestBase {
                 .transferToHost(DataTransferMode.EVERY_EXECUTION, result);
 
         ImmutableTaskGraph immutableTaskGraph = taskGraph.snapshot();
-        TornadoExecutionPlan executionPlan = new TornadoExecutionPlan(immutableTaskGraph);
-        executionPlan.execute();
+        try (TornadoExecutionPlan executionPlan = new TornadoExecutionPlan(immutableTaskGraph)) {
+            executionPlan.execute();
+        }
 
-        byte[] sequential = new byte[] { 8, 8, 8, 8 };
+        ByteArray sequential = new ByteArray(4);
+        sequential.init((byte) 8);
         signedLeftShift(sequential, input, elements);
-        for (int i = 0; i < result.length; i++) {
-            assertEquals(sequential[i], result[i]);
+        for (int i = 0; i < result.getSize(); i++) {
+            assertEquals(sequential.get(i), result.get(i));
         }
     }
 
     @Test
-    public void testSignedRightShift() {
+    public void testSignedRightShift() throws TornadoExecutionPlanException {
 
-        byte[] elements = new byte[] { 4 };
-        byte[] result = new byte[] { 8, 8, 8, 8 };
-        byte[] input = new byte[] { 2, 2, 2, 2, 1, 1, 1, 1 };
+        ByteArray elements = new ByteArray(1);
+        elements.init((byte) 4);
+        ByteArray result = new ByteArray(4);
+        result.init((byte) 8);
+        ByteArray input = ByteArray.fromElements((byte) 2, (byte) 2, (byte) 2, (byte) 2, (byte) 1, (byte) 1, (byte) 1, (byte) 1);
 
         TaskGraph taskGraph = new TaskGraph("s0")//
                 .transferToDevice(DataTransferMode.EVERY_EXECUTION, result, input, elements)//
@@ -363,22 +390,26 @@ public class TestNumericPromotion extends TornadoTestBase {
                 .transferToHost(DataTransferMode.EVERY_EXECUTION, result);
 
         ImmutableTaskGraph immutableTaskGraph = taskGraph.snapshot();
-        TornadoExecutionPlan executionPlan = new TornadoExecutionPlan(immutableTaskGraph);
-        executionPlan.execute();
+        try (TornadoExecutionPlan executionPlan = new TornadoExecutionPlan(immutableTaskGraph)) {
+            executionPlan.execute();
+        }
 
-        byte[] sequential = new byte[] { 8, 8, 8, 8 };
+        ByteArray sequential = new ByteArray(4);
+        sequential.init((byte) 8);
         signedRightShift(sequential, input, elements);
-        for (int i = 0; i < result.length; i++) {
-            assertEquals(sequential[i], result[i]);
+        for (int i = 0; i < result.getSize(); i++) {
+            assertEquals(sequential.get(i), result.get(i));
         }
     }
 
     @Test
-    public void testUnsignedRightShift() {
+    public void testUnsignedRightShift() throws TornadoExecutionPlanException {
 
-        byte[] elements = new byte[] { 4 };
-        byte[] result = new byte[] { 8, 8, 8, 8 };
-        byte[] input = new byte[] { 2, 2, 2, 2, 1, 1, 1, 1 };
+        ByteArray elements = new ByteArray(1);
+        elements.init((byte) 4);
+        ByteArray result = new ByteArray(4);
+        result.init((byte) 8);
+        ByteArray input = ByteArray.fromElements((byte) 2, (byte) 2, (byte) 2, (byte) 2, (byte) 1, (byte) 1, (byte) 1, (byte) 1);
 
         TaskGraph taskGraph = new TaskGraph("s0")//
                 .transferToDevice(DataTransferMode.EVERY_EXECUTION, result, input, elements)//
@@ -386,13 +417,14 @@ public class TestNumericPromotion extends TornadoTestBase {
                 .transferToHost(DataTransferMode.EVERY_EXECUTION, result);
 
         ImmutableTaskGraph immutableTaskGraph = taskGraph.snapshot();
-        TornadoExecutionPlan executionPlan = new TornadoExecutionPlan(immutableTaskGraph);
-        executionPlan.execute();
-
-        byte[] sequential = new byte[] { 8, 8, 8, 8 };
+        try (TornadoExecutionPlan executionPlan = new TornadoExecutionPlan(immutableTaskGraph)) {
+            executionPlan.execute();
+        }
+        ByteArray sequential = new ByteArray(4);
+        sequential.init((byte) 8);
         unsignedRightShift(sequential, input, elements);
-        for (int i = 0; i < result.length; i++) {
-            assertEquals(sequential[i], result[i]);
+        for (int i = 0; i < result.getSize(); i++) {
+            assertEquals(sequential.get(i), result.get(i));
         }
     }
 

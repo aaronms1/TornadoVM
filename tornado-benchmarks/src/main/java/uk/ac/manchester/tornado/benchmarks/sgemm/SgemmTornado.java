@@ -1,12 +1,12 @@
 /*
- * Copyright (c) 2013-2022, 2022, APT Group, Department of Computer Science,
+ * Copyright (c) 2013-2023, APT Group, Department of Computer Science,
  * The University of Manchester.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *    http://www.apache.org/licenses/LICENSE-2.0
+ * http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -17,7 +17,7 @@
  */
 package uk.ac.manchester.tornado.benchmarks.sgemm;
 
-import static uk.ac.manchester.tornado.api.collections.math.TornadoMath.abs;
+import static uk.ac.manchester.tornado.api.math.TornadoMath.abs;
 import static uk.ac.manchester.tornado.benchmarks.LinearAlgebraArrays.sgemm;
 
 import java.util.Random;
@@ -27,10 +27,10 @@ import uk.ac.manchester.tornado.api.TaskGraph;
 import uk.ac.manchester.tornado.api.TornadoExecutionPlan;
 import uk.ac.manchester.tornado.api.WorkerGrid;
 import uk.ac.manchester.tornado.api.WorkerGrid2D;
-import uk.ac.manchester.tornado.api.common.Access;
 import uk.ac.manchester.tornado.api.common.TornadoDevice;
 import uk.ac.manchester.tornado.api.enums.DataTransferMode;
-import uk.ac.manchester.tornado.api.runtime.TornadoRuntime;
+import uk.ac.manchester.tornado.api.runtime.TornadoRuntimeProvider;
+import uk.ac.manchester.tornado.api.types.arrays.FloatArray;
 import uk.ac.manchester.tornado.benchmarks.BenchmarkDriver;
 import uk.ac.manchester.tornado.benchmarks.LinearAlgebraArrays;
 
@@ -39,20 +39,19 @@ import uk.ac.manchester.tornado.benchmarks.LinearAlgebraArrays;
  * How to run?
  * </p>
  * <code>
- *     tornado -m tornado.benchmarks/uk.ac.manchester.tornado.benchmarks.BenchmarkRunner sgemm
+ * tornado -m tornado.benchmarks/uk.ac.manchester.tornado.benchmarks.BenchmarkRunner sgemm
  * </code>
  */
 public class SgemmTornado extends BenchmarkDriver {
 
     private final int m;
     private final int n;
-    private final boolean USE_PREBUILT = Boolean.parseBoolean(TornadoRuntime.getProperty("usePrebuilt", "False"));
     private WorkerGrid worker;
-    private float[] a;
-    private float[] b;
-    private float[] c;
+    private FloatArray a;
+    private FloatArray b;
+    private FloatArray c;
     private GridScheduler grid;
-    private boolean USE_GRID = Boolean.parseBoolean(TornadoRuntime.getProperty("usegrid", "False"));
+    private boolean USE_GRID = Boolean.parseBoolean(TornadoRuntimeProvider.getProperty("usegrid", "False"));
 
     public SgemmTornado(int iterations, int m, int n) {
         super(iterations);
@@ -62,18 +61,18 @@ public class SgemmTornado extends BenchmarkDriver {
 
     @Override
     public void setUp() {
-        a = new float[m * n];
-        b = new float[m * n];
-        c = new float[m * n];
+        a = new FloatArray(m * n);
+        b = new FloatArray(m * n);
+        c = new FloatArray(m * n);
 
         final Random random = new Random();
 
         for (int i = 0; i < m; i++) {
-            a[i * (m + 1)] = 1;
+            a.set(i * (m + 1), 1);
         }
 
         for (int i = 0; i < m * n; i++) {
-            b[i] = random.nextFloat();
+            b.set(i, random.nextFloat());
         }
 
         if (USE_GRID) {
@@ -84,41 +83,13 @@ public class SgemmTornado extends BenchmarkDriver {
         }
 
         taskGraph = new TaskGraph("benchmark");
-        if (!USE_PREBUILT) {
-            taskGraph.transferToDevice(DataTransferMode.EVERY_EXECUTION, a, b);
-            taskGraph.task("sgemm", LinearAlgebraArrays::sgemm, m, n, n, a, b, c);
-            taskGraph.transferToHost(DataTransferMode.EVERY_EXECUTION, c);
 
-            immutableTaskGraph = taskGraph.snapshot();
-            executionPlan = new TornadoExecutionPlan(immutableTaskGraph);
-            executionPlan.withWarmUp();
+        taskGraph.transferToDevice(DataTransferMode.EVERY_EXECUTION, a, b);
+        taskGraph.task("sgemm", LinearAlgebraArrays::sgemm, m, n, n, a, b, c);
+        taskGraph.transferToHost(DataTransferMode.EVERY_EXECUTION, c);
 
-        } else {
-            String filePath = "/tmp/mxmFloat.spv";
-
-            TornadoDevice device = null;
-            int maxDevices = TornadoRuntime.getTornadoRuntime().getDriver(0).getDeviceCount();
-            for (int i = 0; i < maxDevices; i++) {
-                device = TornadoRuntime.getTornadoRuntime().getDriver(0).getDevice(i);
-                if (device.isSPIRVSupported()) {
-                    break;
-                }
-            }
-
-            taskGraph.transferToDevice(DataTransferMode.EVERY_EXECUTION, a, b) //
-                    .prebuiltTask("t0", //
-                            "sgemm", //
-                            filePath, //
-                            new Object[] { m, n, n, a, b, c }, //
-                            new Access[] { Access.READ_ONLY, Access.READ_ONLY, Access.READ_ONLY, Access.READ_ONLY, Access.READ_ONLY, Access.WRITE_ONLY }, //
-                            device, //
-                            new int[] { n, n })//
-                    .transferToHost(DataTransferMode.EVERY_EXECUTION, c);
-
-            immutableTaskGraph = taskGraph.snapshot();
-            executionPlan = new TornadoExecutionPlan(immutableTaskGraph);
-
-        }
+        executionPlan = new TornadoExecutionPlan(taskGraph.snapshot());
+        executionPlan.withWarmUp();
     }
 
     @Override
@@ -134,7 +105,7 @@ public class SgemmTornado extends BenchmarkDriver {
     }
 
     @Override
-    public void benchmarkMethod(TornadoDevice device) {
+    public void runBenchmark(TornadoDevice device) {
         if (grid != null) {
             executionPlan.withGridScheduler(grid);
         }
@@ -144,19 +115,16 @@ public class SgemmTornado extends BenchmarkDriver {
     @Override
     public boolean validate(TornadoDevice device) {
 
-        final float[] result = new float[m * n];
+        final FloatArray result = new FloatArray(m * n);
         boolean val = true;
 
-        benchmarkMethod(device);
-        executionResult.transferToHost(c);
-
+        runBenchmark(device);
         executionPlan.clearProfiles();
-
         sgemm(m, n, m, a, b, result);
 
         for (int i = 0; i < n; i++) {
             for (int j = 0; j < n; j++) {
-                if (abs(result[(i * n) + j] - c[(i * n) + j]) > 0.01) {
+                if (abs(result.get((i * n) + j) - c.get((i * n) + j)) > 0.01) {
                     val = false;
                     break;
                 }
@@ -164,14 +132,6 @@ public class SgemmTornado extends BenchmarkDriver {
         }
         System.out.printf("Number validation: " + val + "\n");
         return val;
-    }
-
-    public void printSummary() {
-        if (isValid()) {
-            System.out.printf("id=%s, elapsed=%f, per iteration=%f\n", TornadoRuntime.getProperty("benchmark.device"), getElapsed(), getElapsedPerIteration());
-        } else {
-            System.out.printf("id=%s produced invalid result\n", TornadoRuntime.getProperty("benchmark.device"));
-        }
     }
 
 }

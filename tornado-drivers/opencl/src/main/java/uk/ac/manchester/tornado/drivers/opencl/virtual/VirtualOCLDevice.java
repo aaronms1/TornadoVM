@@ -12,7 +12,7 @@
  *
  * This code is distributed in the hope that it will be useful, but WITHOUT
  * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
- * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License
  * version 2 for more details (a copy is included in the LICENSE file that
  * accompanied this code).
  *
@@ -31,9 +31,8 @@ import java.nio.ByteOrder;
 import uk.ac.manchester.tornado.drivers.opencl.OCLDeviceContextInterface;
 import uk.ac.manchester.tornado.drivers.opencl.OCLTargetDevice;
 import uk.ac.manchester.tornado.drivers.opencl.enums.OCLDeviceType;
-import uk.ac.manchester.tornado.runtime.common.TornadoLogger;
 
-public class VirtualOCLDevice extends TornadoLogger implements OCLTargetDevice {
+public class VirtualOCLDevice implements OCLTargetDevice {
 
     private final int index;
     private final String name;
@@ -78,7 +77,7 @@ public class VirtualOCLDevice extends TornadoLogger implements OCLTargetDevice {
         this.availableProcessors = info.getAvailableProcessors();
     }
 
-    public long getId() {
+    public long getDevicePointer() {
         return -1;
     }
 
@@ -103,6 +102,7 @@ public class VirtualOCLDevice extends TornadoLogger implements OCLTargetDevice {
         return "DummyVendor";
     }
 
+    @Override
     public String getDriverVersion() {
         return "DummyDriverVersion";
     }
@@ -196,6 +196,16 @@ public class VirtualOCLDevice extends TornadoLogger implements OCLTargetDevice {
     @Override
     public void setDeviceContext(OCLDeviceContextInterface deviceContext) {
         this.deviceContex = deviceContext;
+    }
+
+    @Override
+    public int deviceVersion() {
+        return 0;
+    }
+
+    @Override
+    public boolean isSPIRVSupported() {
+        return true;
     }
 
     public int getWordSize() {

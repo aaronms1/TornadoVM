@@ -12,15 +12,13 @@
  *
  * This code is distributed in the hope that it will be useful, but WITHOUT
  * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
- * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License
  * version 2 for more details (a copy is included in the LICENSE file that
  * accompanied this code).
  *
  * You should have received a copy of the GNU General Public License version
  * 2 along with this work; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
- *
- * Authors: James Clarkson
  *
  */
 package uk.ac.manchester.tornado.runtime;
@@ -35,48 +33,48 @@ import uk.ac.manchester.tornado.api.common.SchedulableTask;
 import uk.ac.manchester.tornado.api.enums.TornadoDeviceType;
 import uk.ac.manchester.tornado.api.enums.TornadoVMBackendType;
 import uk.ac.manchester.tornado.api.exceptions.TornadoInternalError;
-import uk.ac.manchester.tornado.api.memory.ObjectBuffer;
-import uk.ac.manchester.tornado.api.memory.TornadoDeviceObjectState;
+import uk.ac.manchester.tornado.api.memory.DeviceBufferState;
 import uk.ac.manchester.tornado.api.memory.TornadoMemoryProvider;
-import uk.ac.manchester.tornado.runtime.common.DeviceObjectState;
-import uk.ac.manchester.tornado.runtime.common.KernelArgs;
-import uk.ac.manchester.tornado.runtime.common.TornadoAcceleratorDevice;
+import uk.ac.manchester.tornado.api.memory.XPUBuffer;
+import uk.ac.manchester.tornado.runtime.common.KernelStackFrame;
 import uk.ac.manchester.tornado.runtime.common.TornadoInstalledCode;
 import uk.ac.manchester.tornado.runtime.common.TornadoSchedulingStrategy;
+import uk.ac.manchester.tornado.runtime.common.TornadoXPUDevice;
+import uk.ac.manchester.tornado.runtime.common.XPUDeviceBufferState;
 
-public class JVMMapping implements TornadoAcceleratorDevice {
+public class JVMMapping implements TornadoXPUDevice {
 
     @Override
-    public void dumpEvents() {
+    public void dumpEvents(long executionPlanId) {
         TornadoInternalError.unimplemented();
     }
 
     @Override
-    public int enqueueBarrier(int[] events) {
-        TornadoInternalError.unimplemented();
-        return -1;
-    }
-
-    @Override
-    public int enqueueMarker() {
+    public int enqueueBarrier(long executionPlanId, int[] events) {
         TornadoInternalError.unimplemented();
         return -1;
     }
 
     @Override
-    public int enqueueMarker(int[] events) {
+    public int enqueueMarker(long executionPlanId) {
         TornadoInternalError.unimplemented();
         return -1;
     }
 
     @Override
-    public List<Integer> ensurePresent(Object object, TornadoDeviceObjectState objectState, int[] events, long size, long offset) {
+    public int enqueueMarker(long executionPlanId, int[] events) {
+        TornadoInternalError.unimplemented();
+        return -1;
+    }
+
+    @Override
+    public List<Integer> ensurePresent(long executionPlanId, Object object, DeviceBufferState objectState, int[] events, long size, long offset) {
         TornadoInternalError.unimplemented();
         return null;
     }
 
     @Override
-    public void flush() {
+    public void flush(long executionPlanId) {
         TornadoInternalError.unimplemented();
     }
 
@@ -93,22 +91,22 @@ public class JVMMapping implements TornadoAcceleratorDevice {
 
     @Override
     public TornadoSchedulingStrategy getPreferredSchedule() {
-        return TornadoSchedulingStrategy.PER_BLOCK;
+        return TornadoSchedulingStrategy.PER_CPU_BLOCK;
     }
 
     @Override
-    public void reset() {
+    public void clean() {
         TornadoInternalError.unimplemented();
     }
 
     @Override
-    public List<Integer> streamIn(Object object, long batchSize, long hostOffset, TornadoDeviceObjectState objectState, int[] events) {
+    public List<Integer> streamIn(long executionPlanId, Object object, long batchSize, long hostOffset, DeviceBufferState objectState, int[] events) {
         TornadoInternalError.unimplemented();
         return null;
     }
 
     @Override
-    public int streamOutBlocking(Object object, long hostOffset, TornadoDeviceObjectState objectState, int[] list) {
+    public int streamOutBlocking(long executionPlanId, Object object, long hostOffset, DeviceBufferState objectState, int[] list) {
         TornadoInternalError.unimplemented();
         return -1;
     }
@@ -119,16 +117,16 @@ public class JVMMapping implements TornadoAcceleratorDevice {
     }
 
     @Override
-    public void ensureLoaded() {
+    public void ensureLoaded(long executionPlanId) {
     }
 
     @Override
-    public KernelArgs createCallWrapper(int numArgs) {
+    public KernelStackFrame createKernelStackFrame(long executionPlanId, int numArgs) {
         return null;
     }
 
     @Override
-    public ObjectBuffer createOrReuseAtomicsBuffer(int[] arr) {
+    public XPUBuffer createOrReuseAtomicsBuffer(int[] arr) {
         return null;
     }
 
@@ -138,42 +136,42 @@ public class JVMMapping implements TornadoAcceleratorDevice {
     }
 
     @Override
-    public int allocate(Object object, long batchSize, TornadoDeviceObjectState state) {
+    public long allocate(Object object, long batchSize, DeviceBufferState state) {
         return -1;
     }
 
     @Override
-    public int allocateObjects(Object[] objects, long batchSize, TornadoDeviceObjectState[] states) {
+    public synchronized long allocateObjects(Object[] objects, long batchSize, DeviceBufferState[] states) {
         return -1;
     }
 
     @Override
-    public int deallocate(TornadoDeviceObjectState state) {
+    public synchronized long deallocate(DeviceBufferState state) {
         return 0;
     }
 
     @Override
-    public int streamOut(Object object, long hostOffset, TornadoDeviceObjectState objectState, int[] list) {
+    public int streamOut(long executionPlanId, Object object, long hostOffset, DeviceBufferState objectState, int[] list) {
         return -1;
     }
 
     @Override
-    public int enqueueBarrier() {
+    public int enqueueBarrier(long executionPlanId) {
         return -1;
     }
 
     @Override
-    public void sync() {
+    public void sync(long executionPlanId) {
 
     }
 
     @Override
-    public Event resolveEvent(int event) {
+    public Event resolveEvent(long executionPlanId, int event) {
         return new EmptyEvent();
     }
 
     @Override
-    public void flushEvents() {
+    public void flushEvents(long executionPlanId) {
 
     }
 
@@ -223,7 +221,7 @@ public class JVMMapping implements TornadoAcceleratorDevice {
     }
 
     @Override
-    public int[] updateAtomicRegionAndObjectState(SchedulableTask task, int[] array, int paramIndex, Object value, DeviceObjectState objectState) {
+    public int[] updateAtomicRegionAndObjectState(SchedulableTask task, int[] array, int paramIndex, Object value, XPUDeviceBufferState objectState) {
         return null;
     }
 
@@ -243,7 +241,7 @@ public class JVMMapping implements TornadoAcceleratorDevice {
     }
 
     @Override
-    public void setAtomicRegion(ObjectBuffer bufferAtomics) {
+    public void setAtomicRegion(XPUBuffer bufferAtomics) {
 
     }
 

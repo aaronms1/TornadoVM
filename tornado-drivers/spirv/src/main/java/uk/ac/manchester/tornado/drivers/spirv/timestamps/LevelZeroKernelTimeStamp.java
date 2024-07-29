@@ -12,7 +12,7 @@
  *
  * This code is distributed in the hope that it will be useful, but WITHOUT
  * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
- * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License
  * version 2 for more details (a copy is included in the LICENSE file that
  * accompanied this code).
  *
@@ -41,7 +41,7 @@ import uk.ac.manchester.tornado.drivers.spirv.levelzero.ZeEventScopeFlags;
 import uk.ac.manchester.tornado.drivers.spirv.levelzero.ZeHostMemAllocDescriptor;
 import uk.ac.manchester.tornado.drivers.spirv.levelzero.ZeKernelTimeStampResult;
 import uk.ac.manchester.tornado.drivers.spirv.levelzero.utils.LevelZeroUtils;
-import uk.ac.manchester.tornado.runtime.common.Tornado;
+import uk.ac.manchester.tornado.runtime.common.TornadoOptions;
 import uk.ac.manchester.tornado.runtime.tasks.meta.TaskMetaData;
 
 public class LevelZeroKernelTimeStamp {
@@ -93,7 +93,7 @@ public class LevelZeroKernelTimeStamp {
         LevelZeroUtils.errorLog("zeEventCreate", result);
     }
 
-    public void solveEvent(TaskMetaData meta) {
+    public void solveEvent(long executionPlanId, TaskMetaData meta) {
         timeStampBuffer = new LevelZeroByteBuffer();
         ZeHostMemAllocDescriptor hostMemAllocDesc = new ZeHostMemAllocDescriptor();
         LevelZeroContext context = commandList.getContext();
@@ -103,20 +103,20 @@ public class LevelZeroKernelTimeStamp {
         result = commandList.zeCommandListAppendQueryKernelTimestamps(commandList.getCommandListHandlerPtr(), 1, kernelEventTimer, timeStampBuffer, null, null, 0, null);
         LevelZeroUtils.errorLog("zeCommandListAppendQueryKernelTimestamps", result);
         LevelZeroDevice device = commandQueue.getDevice();
-        solveKernelEvent(device);
+        solveKernelEvent(executionPlanId, device);
         updateProfiler(resultKernel, meta);
     }
 
-    public void solveKernelEvent(LevelZeroDevice device) {
+    public void solveKernelEvent(long executionPlanId, LevelZeroDevice device) {
         ZeDeviceProperties deviceProperties = new ZeDeviceProperties();
         int result = device.zeDeviceGetProperties(device.getDeviceHandlerPtr(), deviceProperties);
         LevelZeroUtils.errorLog("zeDeviceGetProperties", result);
         resultKernel = new ZeKernelTimeStampResult(deviceProperties);
-        deviceContext.flush(device.getDeviceIndex());
+        deviceContext.flush(executionPlanId, device.getDeviceIndex());
 
         resultKernel.resolve(timeStampBuffer);
 
-        if (Tornado.DEBUG) {
+        if (TornadoOptions.DEBUG) {
             resultKernel.printTimers();
         }
     }

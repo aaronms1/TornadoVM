@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018, 2022-2023, APT Group, Department of Computer Science,
+ * Copyright (c) 2018, 2022-2024, APT Group, Department of Computer Science,
  * The University of Manchester. All rights reserved.
  * Copyright (c) 2009, 2012, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
@@ -10,15 +10,13 @@
  *
  * This code is distributed in the hope that it will be useful, but WITHOUT
  * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
- * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License
  * version 2 for more details (a copy is included in the LICENSE file that
  * accompanied this code).
  *
  * You should have received a copy of the GNU General Public License version
  * 2 along with this work; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
- *
- * Authors: James Clarkson
  *
  */
 package uk.ac.manchester.tornado.drivers.opencl.graal.asm;
@@ -76,6 +74,8 @@ public final class OCLAssembler extends Assembler {
             emitLine("#pragma OPENCL EXTENSION cl_khr_fp64 : enable  ");
         }
 
+        emitLine("#pragma OPENCL EXTENSION cl_khr_fp16 : enable  ");
+
         if (((OCLTargetDescription) target).supportsInt64Atomics()) {
             emitLine("#pragma OPENCL EXTENSION cl_khr_int64_base_atomics : enable  ");
         }
@@ -90,7 +90,7 @@ public final class OCLAssembler extends Assembler {
      * platform type.
      *
      * @param input
-     *            The {@link Value} input to convert.
+     *     The {@link Value} input to convert.
      * @return The converted format string.
      */
     public static String convertValueFromGraalFormat(Value input) {
@@ -117,8 +117,8 @@ public final class OCLAssembler extends Assembler {
      * It retrieves the absolute index from the given Value object.
      *
      * @param value
-     *            the {@link Value} object to extract the index from. It should be
-     *            in the format "int[20|0x14]".
+     *     the {@link Value} object to extract the index from. It should be
+     *     in the format "int[20|0x14]".
      * @return the absolute index as a String
      */
     public static String getAbsoluteIndexFromValue(Value value) {
@@ -706,6 +706,8 @@ public final class OCLAssembler extends Assembler {
         public static final OCLUnaryIntrinsic WRITE_MEM_FENCE = new OCLUnaryIntrinsic("write_mem_fence");
 
         public static final OCLUnaryIntrinsic ABS = new OCLUnaryIntrinsic("abs");
+
+        public static final OCLUnaryIntrinsic CEIL = new OCLUnaryIntrinsic("ceil");
         public static final OCLUnaryIntrinsic EXP = new OCLUnaryIntrinsic("exp");
         public static final OCLUnaryIntrinsic SQRT = new OCLUnaryIntrinsic("sqrt");
         public static final OCLUnaryIntrinsic LOG = new OCLUnaryIntrinsic("log");
@@ -945,6 +947,22 @@ public final class OCLAssembler extends Assembler {
         public static final OCLBinaryTemplate NEW_PRIVATE_SHORT_ARRAY = new OCLBinaryTemplate("new private array short", "__private short %s[%s]");
         public static final OCLBinaryTemplate NEW_PRIVATE_BYTE_ARRAY = new OCLBinaryTemplate("new private array byte", "__private byte %s[%s]");
 
+        public static final OCLBinaryTemplate PRIVATE_INT_ARRAY_PTR = new OCLBinaryTemplate("private pointer array int", "__private int* %s = %s");
+        public static final OCLBinaryTemplate PRIVATE_CHAR_ARRAY_PTR = new OCLBinaryTemplate("private pointer array char", "__private char* %s = %s");
+        public static final OCLBinaryTemplate PRIVATE_FLOAT_ARRAY_PTR = new OCLBinaryTemplate("private pointer array float", "__private float* %s = %s");
+        public static final OCLBinaryTemplate PRIVATE_DOUBLE_ARRAY_PTR = new OCLBinaryTemplate("private pointer array double", "__private double* %s = %s");
+        public static final OCLBinaryTemplate PRIVATE_LONG_ARRAY_PTR = new OCLBinaryTemplate("private pointer array long", "__private long* %s = %s");
+        public static final OCLBinaryTemplate PRIVATE_SHORT_ARRAY_PTR = new OCLBinaryTemplate("private pointer array short", "__private short* %s = %s");
+        public static final OCLBinaryTemplate PRIVATE_BYTE_ARRAY_PTR = new OCLBinaryTemplate("private pointer array byte", "__private byte* %s = %s");
+
+        public static final OCLBinaryTemplate PRIVATE_INT_ARRAY_PTR_COPY = new OCLBinaryTemplate("private pointer copy array int", "__private int* %s = ((__private int *) %s)");
+        public static final OCLBinaryTemplate PRIVATE_CHAR_ARRAY_PTR_COPY = new OCLBinaryTemplate("private pointer copy array char", "__private char* %s = ((__private char *) %s)");
+        public static final OCLBinaryTemplate PRIVATE_FLOAT_ARRAY_PTR_COPY = new OCLBinaryTemplate("private pointer copy array float", "__private float* %s = ((__private float *) %s)");
+        public static final OCLBinaryTemplate PRIVATE_DOUBLE_ARRAY_PTR_COPY = new OCLBinaryTemplate("private pointer copy array double", "__private double* %s = ((__private double *) %s)");
+        public static final OCLBinaryTemplate PRIVATE_LONG_ARRAY_PTR_COPY = new OCLBinaryTemplate("private pointer copy array long", "__private long* %s = ((__private long *) %s)");
+        public static final OCLBinaryTemplate PRIVATE_SHORT_ARRAY_PTR_COPY = new OCLBinaryTemplate("private pointer copy array short", "__private short* %s = ((__private short *) %s)");
+        public static final OCLBinaryTemplate PRIVATE_BYTE_ARRAY_PTR_COPY = new OCLBinaryTemplate("private pointer copy array byte", "__private byte* %s = ((__private byte *) %s)");
+
         public static final OCLBinaryTemplate NEW_LOCAL_FLOAT_ARRAY = new OCLBinaryTemplate("local memory array float", "__local float %s[%s]");
         public static final OCLBinaryTemplate NEW_LOCAL_INT_ARRAY = new OCLBinaryTemplate("local memory array int", "__local int %s[%s]");
         public static final OCLBinaryTemplate NEW_LOCAL_DOUBLE_ARRAY = new OCLBinaryTemplate("local memory array double", "__local double %s[%s]");
@@ -1063,6 +1081,8 @@ public final class OCLAssembler extends Assembler {
         public static final OCLOp2 VMOV_FLOAT2 = new OCLOp2("(float2)");
         public static final OCLOp2 VMOV_BYTE2 = new OCLOp2("(char2)");
         public static final OCLOp2 VMOV_DOUBLE2 = new OCLOp2("(double2)");
+
+        public static final OCLOp2 VMOV_HALF2 = new OCLOp2("(half2)");
         // @formatter:on
 
         protected OCLOp2(String opcode) {
@@ -1090,6 +1110,8 @@ public final class OCLAssembler extends Assembler {
         public static final OCLOp3 VMOV_BYTE3 = new OCLOp3("(char3)");
         public static final OCLOp3 VMOV_DOUBLE3 = new OCLOp3("(double3)");
 
+        public static final OCLOp3 VMOV_HALF3 = new OCLOp3("(half3)");
+
         // @formatter:on
         public OCLOp3(String opcode) {
             super(opcode);
@@ -1116,6 +1138,8 @@ public final class OCLAssembler extends Assembler {
         public static final OCLOp4 VMOV_FLOAT4 = new OCLOp4("(float4)");
         public static final OCLOp4 VMOV_BYTE4 = new OCLOp4("(char4)");
         public static final OCLOp4 VMOV_DOUBLE4 = new OCLOp4("(double4)");
+
+        public static final OCLOp4 VMOV_HALF4 = new OCLOp4("(half4)");
         // @formatter:on
 
         protected OCLOp4(String opcode) {
@@ -1145,6 +1169,8 @@ public final class OCLAssembler extends Assembler {
         public static final OCLOp8 VMOV_FLOAT8 = new OCLOp8("(float8)");
         public static final OCLOp8 VMOV_BYTE8 = new OCLOp8("(char8)");
         public static final OCLOp8 VMOV_DOUBLE8 = new OCLOp8("(double8)");
+
+        public static final OCLOp8 VMOV_HALF8 = new OCLOp8("(half8)");
 
         // @formatter:on
 
@@ -1177,7 +1203,12 @@ public final class OCLAssembler extends Assembler {
 
     public static class OCLOp16 extends OCLOp8 {
         // @formatter:off
-
+        public static final OCLOp16 VMOV_SHORT16 = new OCLOp16("(short16)");
+        public static final OCLOp16 VMOV_INT16 = new OCLOp16("(int16)");
+        public static final OCLOp16 VMOV_FLOAT16 = new OCLOp16("(float16)");
+        public static final OCLOp16 VMOV_BYTE16 = new OCLOp16("(char16)");
+        public static final OCLOp16 VMOV_DOUBLE16 = new OCLOp16("(double16)");
+        public static final OCLOp16 VMOV_HALF16 = new OCLOp16("(half16)");
         // @formatter:on
         protected OCLOp16(String opcode) {
             super(opcode);

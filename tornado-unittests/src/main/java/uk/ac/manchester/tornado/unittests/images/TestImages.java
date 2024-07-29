@@ -6,7 +6,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *    http://www.apache.org/licenses/LICENSE-2.0
+ * http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -20,24 +20,27 @@ package uk.ac.manchester.tornado.unittests.images;
 
 import static org.junit.Assert.assertEquals;
 
+import java.util.Random;
+
 import org.junit.Test;
 
 import uk.ac.manchester.tornado.api.ImmutableTaskGraph;
 import uk.ac.manchester.tornado.api.TaskGraph;
 import uk.ac.manchester.tornado.api.TornadoExecutionPlan;
 import uk.ac.manchester.tornado.api.annotations.Parallel;
-import uk.ac.manchester.tornado.api.collections.types.Byte3;
-import uk.ac.manchester.tornado.api.collections.types.Byte4;
-import uk.ac.manchester.tornado.api.collections.types.Float3;
-import uk.ac.manchester.tornado.api.collections.types.Float4;
-import uk.ac.manchester.tornado.api.collections.types.Float8;
-import uk.ac.manchester.tornado.api.collections.types.ImageByte3;
-import uk.ac.manchester.tornado.api.collections.types.ImageByte4;
-import uk.ac.manchester.tornado.api.collections.types.ImageFloat;
-import uk.ac.manchester.tornado.api.collections.types.ImageFloat3;
-import uk.ac.manchester.tornado.api.collections.types.ImageFloat4;
-import uk.ac.manchester.tornado.api.collections.types.ImageFloat8;
 import uk.ac.manchester.tornado.api.enums.DataTransferMode;
+import uk.ac.manchester.tornado.api.exceptions.TornadoExecutionPlanException;
+import uk.ac.manchester.tornado.api.types.images.ImageByte3;
+import uk.ac.manchester.tornado.api.types.images.ImageByte4;
+import uk.ac.manchester.tornado.api.types.images.ImageFloat;
+import uk.ac.manchester.tornado.api.types.images.ImageFloat3;
+import uk.ac.manchester.tornado.api.types.images.ImageFloat4;
+import uk.ac.manchester.tornado.api.types.images.ImageFloat8;
+import uk.ac.manchester.tornado.api.types.vectors.Byte3;
+import uk.ac.manchester.tornado.api.types.vectors.Byte4;
+import uk.ac.manchester.tornado.api.types.vectors.Float3;
+import uk.ac.manchester.tornado.api.types.vectors.Float4;
+import uk.ac.manchester.tornado.api.types.vectors.Float8;
 import uk.ac.manchester.tornado.unittests.common.TornadoTestBase;
 
 /**
@@ -47,191 +50,18 @@ import uk.ac.manchester.tornado.unittests.common.TornadoTestBase;
  * How to run?
  * </p>
  * <code>
- *     tornado-test -V uk.ac.manchester.tornado.unittests.images.TestImages
+ * tornado-test -V uk.ac.manchester.tornado.unittests.images.TestImages
  * </code>
  *
  */
 public class TestImages extends TornadoTestBase {
-
-    /**
-     * Test for image::fill kernel with square image.
-     */
-    @Test
-    public void testImageFloat01() {
-
-        final int N = 128;
-        final int M = 128;
-
-        final ImageFloat image = new ImageFloat(M, N);
-        image.fill(100f);
-
-        final TaskGraph taskGraph = new TaskGraph("s0") //
-                .transferToDevice(DataTransferMode.FIRST_EXECUTION, image) //
-                .task("t0", image::fill, 1f) //
-                .transferToHost(DataTransferMode.EVERY_EXECUTION, image);
-
-        ImmutableTaskGraph immutableTaskGraph = taskGraph.snapshot();
-        TornadoExecutionPlan executionPlan = new TornadoExecutionPlan(immutableTaskGraph);
-        executionPlan.execute();
-
-        for (int i = 0; i < M; i++) {
-            for (int j = 0; j < N; j++) {
-                assertEquals(1f, image.get(i, j), 0.001);
-            }
-        }
-    }
-
-    /**
-     * Test for image::fill kernel with non-square image.
-     */
-    @Test
-    public void testImageFloat02() {
-
-        final int M = 128;
-        final int N = 32;
-
-        final ImageFloat image = new ImageFloat(M, N);
-        image.fill(100f);
-
-        final TaskGraph taskGraph = new TaskGraph("s0") //
-                .task("t0", image::fill, 1f) //
-                .transferToHost(DataTransferMode.EVERY_EXECUTION, image);
-
-        ImmutableTaskGraph immutableTaskGraph = taskGraph.snapshot();
-        TornadoExecutionPlan executionPlan = new TornadoExecutionPlan(immutableTaskGraph);
-        executionPlan.execute();
-
-        for (int i = 0; i < M; i++) {
-            for (int j = 0; j < N; j++) {
-                assertEquals(1f, image.get(i, j), 0.001);
-            }
-        }
-    }
-
-    /**
-     * Test for image::fill kernel with non-square image.
-     */
-    @Test
-    public void testImageFloat03() {
-
-        final int M = 32;
-        final int N = 512;
-
-        final ImageFloat image = new ImageFloat(M, N);
-        image.fill(100f);
-
-        final TaskGraph taskGraph = new TaskGraph("s0") //
-                .task("t0", image::fill, 1f) //
-                .transferToHost(DataTransferMode.EVERY_EXECUTION, image);
-
-        ImmutableTaskGraph immutableTaskGraph = taskGraph.snapshot();
-        TornadoExecutionPlan executionPlan = new TornadoExecutionPlan(immutableTaskGraph);
-        executionPlan.execute();
-
-        for (int i = 0; i < M; i++) {
-            for (int j = 0; j < N; j++) {
-                assertEquals(1f, image.get(i, j), 0.001);
-            }
-        }
-    }
+    // CHECKSTYLE:OFF
 
     public static void taskWithImages(final ImageFloat a, final ImageFloat b) {
         for (@Parallel int i = 0; i < a.X(); i++) {
             for (@Parallel int j = 0; j < a.Y(); j++) {
                 float value = a.get(i, j);
                 b.set(i, j, value);
-            }
-        }
-    }
-
-    /**
-     * Test for computing a referenced method using {@link ImageFloat} on the OpenCL
-     * device using square-matrices.
-     */
-    @Test
-    public void testImageFloat04() {
-
-        final int M = 32;
-        final int N = 32;
-
-        final ImageFloat imageA = new ImageFloat(M, N);
-        final ImageFloat imageB = new ImageFloat(M, N);
-        imageA.fill(100f);
-
-        TaskGraph taskGraph = new TaskGraph("s0") //
-                .transferToDevice(DataTransferMode.FIRST_EXECUTION, imageA) //
-                .task("t1", TestImages::taskWithImages, imageA, imageB) //
-                .transferToHost(DataTransferMode.EVERY_EXECUTION, imageB);
-
-        ImmutableTaskGraph immutableTaskGraph = taskGraph.snapshot();
-        TornadoExecutionPlan executionPlan = new TornadoExecutionPlan(immutableTaskGraph);
-        executionPlan.execute();
-
-        for (int i = 0; i < M; i++) {
-            for (int j = 0; j < N; j++) {
-                assertEquals(100f, imageB.get(i, j), 0.001);
-            }
-        }
-    }
-
-    /**
-     * Test for computing a referenced method using {@link ImageFloat} on the OpenCL
-     * device using non-square matrices and small size.
-     */
-    @Test
-    public void testImageFloat05() {
-
-        final int M = 16;
-        final int N = 4;
-
-        final ImageFloat imageA = new ImageFloat(M, N);
-        final ImageFloat imageB = new ImageFloat(M, N);
-        imageA.fill(100f);
-        imageB.fill(-1f);
-
-        final TaskGraph taskGraph = new TaskGraph("s0") //
-                .transferToDevice(DataTransferMode.FIRST_EXECUTION, imageA) //
-                .task("t1", TestImages::taskWithImages, imageA, imageB) //
-                .transferToHost(DataTransferMode.EVERY_EXECUTION, imageB);
-
-        ImmutableTaskGraph immutableTaskGraph = taskGraph.snapshot();
-        TornadoExecutionPlan executionPlan = new TornadoExecutionPlan(immutableTaskGraph);
-        executionPlan.execute();
-
-        for (int i = 0; i < M; i++) {
-            for (int j = 0; j < N; j++) {
-                assertEquals(100f, imageB.get(i, j), 0.001);
-            }
-        }
-    }
-
-    /**
-     * Test for computing a referenced method using {@link ImageFloat} on the OpenCL
-     * device using non-square matrices with big size.
-     */
-    @Test
-    public void testImageFloat06() {
-
-        final int M = 256;
-        final int N = 512;
-
-        final ImageFloat imageA = new ImageFloat(M, N);
-        final ImageFloat imageB = new ImageFloat(M, N);
-        imageA.fill(100f);
-        imageB.fill(-1f);
-
-        final TaskGraph taskGraph = new TaskGraph("s0") //
-                .transferToDevice(DataTransferMode.FIRST_EXECUTION, imageA) //
-                .task("t1", TestImages::taskWithImages, imageA, imageB) //
-                .transferToHost(DataTransferMode.EVERY_EXECUTION, imageB);
-
-        ImmutableTaskGraph immutableTaskGraph = taskGraph.snapshot();
-        TornadoExecutionPlan executionPlan = new TornadoExecutionPlan(immutableTaskGraph);
-        executionPlan.execute();
-
-        for (int i = 0; i < M; i++) {
-            for (int j = 0; j < N; j++) {
-                assertEquals(100f, imageB.get(i, j), 0.001);
             }
         }
     }
@@ -263,8 +93,234 @@ public class TestImages extends TornadoTestBase {
         }
     }
 
+    public static void taskWithImagesByte3(final ImageByte3 a, final ImageByte3 b) {
+        for (@Parallel int i = 0; i < a.X(); i++) {
+            for (@Parallel int j = 0; j < a.Y(); j++) {
+                Byte3 value = a.get(i, j);
+                b.set(i, j, value);
+            }
+        }
+    }
+
+    public static void taskWithImagesByte4(final ImageByte4 a, final ImageByte4 b) {
+        for (@Parallel int i = 0; i < a.X(); i++) {
+            for (@Parallel int j = 0; j < a.Y(); j++) {
+                Byte4 value = a.get(i, j);
+                b.set(i, j, value);
+            }
+        }
+    }
+
+    public static void testCopyImagesParallel(final ImageFloat a, final ImageFloat b) {
+        for (@Parallel int i = 0; i < a.X(); i++) {
+            for (@Parallel int j = 0; j < a.Y(); j++) {
+                float value = a.get(i, j) + 1;
+                b.set(i, j, value);
+            }
+        }
+    }
+
+    public static void testCopyImagesParallelRandom(final ImageFloat a, final ImageFloat b) {
+        for (@Parallel int i = 0; i < a.X(); i++) {
+            for (@Parallel int j = 0; j < a.Y(); j++) {
+                float value = a.get(i, j) + 0.01f;
+                b.set(i, j, value);
+            }
+        }
+    }
+
+    public static void testCopyImagesSequential(final ImageFloat a, final ImageFloat b) {
+        for (int i = 0; i < a.X(); i++) {
+            for (int j = 0; j < a.Y(); j++) {
+                float value = a.get(i, j) + 1;
+                b.set(i, j, value);
+            }
+        }
+    }
+
+    /**
+     * Test for image::fill kernel with square image.
+     */
     @Test
-    public void testImageFloat07() {
+    public void testImageFloat01() throws TornadoExecutionPlanException {
+
+        final int N = 128;
+        final int M = 128;
+
+        final ImageFloat image = new ImageFloat(M, N);
+        image.fill(100f);
+
+        final TaskGraph taskGraph = new TaskGraph("s0") //
+                .transferToDevice(DataTransferMode.FIRST_EXECUTION, image) //
+                .task("t0", image::fill, 1f) //
+                .transferToHost(DataTransferMode.EVERY_EXECUTION, image);
+
+        ImmutableTaskGraph immutableTaskGraph = taskGraph.snapshot();
+        try (TornadoExecutionPlan executionPlan = new TornadoExecutionPlan(immutableTaskGraph)) {
+            executionPlan.execute();
+        }
+
+        for (int i = 0; i < M; i++) {
+            for (int j = 0; j < N; j++) {
+                assertEquals(1f, image.get(i, j), 0.001);
+            }
+        }
+    }
+
+    /**
+     * Test for image::fill kernel with non-square image.
+     */
+    @Test
+    public void testImageFloat02() throws TornadoExecutionPlanException {
+
+        final int M = 128;
+        final int N = 32;
+
+        final ImageFloat image = new ImageFloat(M, N);
+        image.fill(100f);
+
+        final TaskGraph taskGraph = new TaskGraph("s0") //
+                .task("t0", image::fill, 1f) //
+                .transferToHost(DataTransferMode.EVERY_EXECUTION, image);
+
+        ImmutableTaskGraph immutableTaskGraph = taskGraph.snapshot();
+        try (TornadoExecutionPlan executionPlan = new TornadoExecutionPlan(immutableTaskGraph)) {
+            executionPlan.execute();
+        }
+
+        for (int i = 0; i < M; i++) {
+            for (int j = 0; j < N; j++) {
+                assertEquals(1f, image.get(i, j), 0.001);
+            }
+        }
+    }
+
+    /**
+     * Test for image::fill kernel with non-square image.
+     */
+    @Test
+    public void testImageFloat03() throws TornadoExecutionPlanException {
+
+        final int M = 32;
+        final int N = 512;
+
+        final ImageFloat image = new ImageFloat(M, N);
+        image.fill(100f);
+
+        final TaskGraph taskGraph = new TaskGraph("s0") //
+                .task("t0", image::fill, 1f) //
+                .transferToHost(DataTransferMode.EVERY_EXECUTION, image);
+
+        ImmutableTaskGraph immutableTaskGraph = taskGraph.snapshot();
+        try (TornadoExecutionPlan executionPlan = new TornadoExecutionPlan(immutableTaskGraph)) {
+            executionPlan.execute();
+        }
+
+        for (int i = 0; i < M; i++) {
+            for (int j = 0; j < N; j++) {
+                assertEquals(1f, image.get(i, j), 0.001);
+            }
+        }
+    }
+
+    /**
+     * Test for computing a referenced method using {@link ImageFloat} on the OpenCL
+     * device using square-matrices.
+     */
+    @Test
+    public void testImageFloat04() throws TornadoExecutionPlanException {
+
+        final int M = 32;
+        final int N = 32;
+
+        final ImageFloat imageA = new ImageFloat(M, N);
+        final ImageFloat imageB = new ImageFloat(M, N);
+        imageA.fill(100f);
+        imageB.fill(0f);
+
+        TaskGraph taskGraph = new TaskGraph("s0") //
+                .transferToDevice(DataTransferMode.FIRST_EXECUTION, imageA) //
+                .task("t1", TestImages::taskWithImages, imageA, imageB) //
+                .transferToHost(DataTransferMode.EVERY_EXECUTION, imageB);
+
+        ImmutableTaskGraph immutableTaskGraph = taskGraph.snapshot();
+        try (TornadoExecutionPlan executionPlan = new TornadoExecutionPlan(immutableTaskGraph)) {
+            executionPlan.execute();
+        }
+
+        for (int i = 0; i < M; i++) {
+            for (int j = 0; j < N; j++) {
+                assertEquals(100f, imageB.get(i, j), 0.001);
+            }
+        }
+    }
+
+    /**
+     * Test for computing a referenced method using {@link ImageFloat} on the OpenCL
+     * device using non-square matrices and small size.
+     */
+    @Test
+    public void testImageFloat05() throws TornadoExecutionPlanException {
+
+        final int M = 16;
+        final int N = 4;
+
+        final ImageFloat imageA = new ImageFloat(M, N);
+        final ImageFloat imageB = new ImageFloat(M, N);
+        imageA.fill(100f);
+        imageB.fill(-1f);
+
+        final TaskGraph taskGraph = new TaskGraph("s0") //
+                .transferToDevice(DataTransferMode.FIRST_EXECUTION, imageA) //
+                .task("t1", TestImages::taskWithImages, imageA, imageB) //
+                .transferToHost(DataTransferMode.EVERY_EXECUTION, imageB);
+
+        ImmutableTaskGraph immutableTaskGraph = taskGraph.snapshot();
+        try (TornadoExecutionPlan executionPlan = new TornadoExecutionPlan(immutableTaskGraph)) {
+            executionPlan.execute();
+        }
+
+        for (int i = 0; i < M; i++) {
+            for (int j = 0; j < N; j++) {
+                assertEquals(100f, imageB.get(i, j), 0.001);
+            }
+        }
+    }
+
+    /**
+     * Test for computing a referenced method using {@link ImageFloat} on the OpenCL
+     * device using non-square matrices with big size.
+     */
+    @Test
+    public void testImageFloat06() throws TornadoExecutionPlanException {
+
+        final int M = 256;
+        final int N = 512;
+
+        final ImageFloat imageA = new ImageFloat(M, N);
+        final ImageFloat imageB = new ImageFloat(M, N);
+        imageA.fill(100f);
+        imageB.fill(-1f);
+
+        final TaskGraph taskGraph = new TaskGraph("s0") //
+                .transferToDevice(DataTransferMode.FIRST_EXECUTION, imageA) //
+                .task("t1", TestImages::taskWithImages, imageA, imageB) //
+                .transferToHost(DataTransferMode.EVERY_EXECUTION, imageB);
+
+        ImmutableTaskGraph immutableTaskGraph = taskGraph.snapshot();
+        try (TornadoExecutionPlan executionPlan = new TornadoExecutionPlan(immutableTaskGraph)) {
+            executionPlan.execute();
+        }
+
+        for (int i = 0; i < M; i++) {
+            for (int j = 0; j < N; j++) {
+                assertEquals(100f, imageB.get(i, j), 0.001);
+            }
+        }
+    }
+
+    @Test
+    public void testImageFloat07() throws TornadoExecutionPlanException {
 
         final int M = 512;
         final int N = 512;
@@ -286,8 +342,9 @@ public class TestImages extends TornadoTestBase {
                 .transferToHost(DataTransferMode.EVERY_EXECUTION, imageB);
 
         ImmutableTaskGraph immutableTaskGraph = taskGraph.snapshot();
-        TornadoExecutionPlan executionPlan = new TornadoExecutionPlan(immutableTaskGraph);
-        executionPlan.execute();
+        try (TornadoExecutionPlan executionPlan = new TornadoExecutionPlan(immutableTaskGraph)) {
+            executionPlan.execute();
+        }
 
         for (int i = 0; i < M; i++) {
             for (int j = 0; j < N; j++) {
@@ -300,7 +357,7 @@ public class TestImages extends TornadoTestBase {
     }
 
     @Test
-    public void testImageFloat08() {
+    public void testImageFloat08() throws TornadoExecutionPlanException {
 
         final int M = 512;
         final int N = 32;
@@ -322,8 +379,9 @@ public class TestImages extends TornadoTestBase {
                 .transferToHost(DataTransferMode.EVERY_EXECUTION, imageB);
 
         ImmutableTaskGraph immutableTaskGraph = taskGraph.snapshot();
-        TornadoExecutionPlan executionPlan = new TornadoExecutionPlan(immutableTaskGraph);
-        executionPlan.execute();
+        try (TornadoExecutionPlan executionPlan = new TornadoExecutionPlan(immutableTaskGraph)) {
+            executionPlan.execute();
+        }
 
         for (int i = 0; i < M; i++) {
             for (int j = 0; j < N; j++) {
@@ -336,7 +394,7 @@ public class TestImages extends TornadoTestBase {
     }
 
     @Test
-    public void testImageFloat09() {
+    public void testImageFloat09() throws TornadoExecutionPlanException {
 
         final int M = 512;
         final int N = 512;
@@ -358,8 +416,9 @@ public class TestImages extends TornadoTestBase {
                 .transferToHost(DataTransferMode.EVERY_EXECUTION, imageB);
 
         ImmutableTaskGraph immutableTaskGraph = taskGraph.snapshot();
-        TornadoExecutionPlan executionPlan = new TornadoExecutionPlan(immutableTaskGraph);
-        executionPlan.execute();
+        try (TornadoExecutionPlan executionPlan = new TornadoExecutionPlan(immutableTaskGraph)) {
+            executionPlan.execute();
+        }
 
         for (int i = 0; i < M; i++) {
             for (int j = 0; j < N; j++) {
@@ -373,7 +432,7 @@ public class TestImages extends TornadoTestBase {
     }
 
     @Test
-    public void testImageFloat10() {
+    public void testImageFloat10() throws TornadoExecutionPlanException {
 
         final int M = 32;
         final int N = 512;
@@ -395,8 +454,9 @@ public class TestImages extends TornadoTestBase {
                 .transferToHost(DataTransferMode.EVERY_EXECUTION, imageB);
 
         ImmutableTaskGraph immutableTaskGraph = taskGraph.snapshot();
-        TornadoExecutionPlan executionPlan = new TornadoExecutionPlan(immutableTaskGraph);
-        executionPlan.execute();
+        try (TornadoExecutionPlan executionPlan = new TornadoExecutionPlan(immutableTaskGraph)) {
+            executionPlan.execute();
+        }
 
         for (int i = 0; i < M; i++) {
             for (int j = 0; j < N; j++) {
@@ -410,7 +470,7 @@ public class TestImages extends TornadoTestBase {
     }
 
     @Test
-    public void testImageFloat11() {
+    public void testImageFloat11() throws TornadoExecutionPlanException {
 
         final int M = 512;
         final int N = 32;
@@ -432,9 +492,9 @@ public class TestImages extends TornadoTestBase {
                 .transferToHost(DataTransferMode.EVERY_EXECUTION, imageB);
 
         ImmutableTaskGraph immutableTaskGraph = taskGraph.snapshot();
-        TornadoExecutionPlan executionPlan = new TornadoExecutionPlan(immutableTaskGraph);
-        executionPlan.execute();
-
+        try (TornadoExecutionPlan executionPlan = new TornadoExecutionPlan(immutableTaskGraph)) {
+            executionPlan.execute();
+        }
         for (int i = 0; i < M; i++) {
             for (int j = 0; j < N; j++) {
                 Float8 result = imageB.get(i, j);
@@ -450,26 +510,8 @@ public class TestImages extends TornadoTestBase {
         }
     }
 
-    public static void taskWithImagesByte3(final ImageByte3 a, final ImageByte3 b) {
-        for (@Parallel int i = 0; i < a.X(); i++) {
-            for (@Parallel int j = 0; j < a.Y(); j++) {
-                Byte3 value = a.get(i, j);
-                b.set(i, j, value);
-            }
-        }
-    }
-
-    public static void taskWithImagesByte4(final ImageByte4 a, final ImageByte4 b) {
-        for (@Parallel int i = 0; i < a.X(); i++) {
-            for (@Parallel int j = 0; j < a.Y(); j++) {
-                Byte4 value = a.get(i, j);
-                b.set(i, j, value);
-            }
-        }
-    }
-
     @Test
-    public void testImageFloat12() {
+    public void testImageFloat12() throws TornadoExecutionPlanException {
 
         final int M = 512;
         final int N = 512;
@@ -480,7 +522,7 @@ public class TestImages extends TornadoTestBase {
 
         for (int i = 0; i < M; i++) {
             for (int j = 0; j < N; j++) {
-                Byte3 value = new Byte3(new byte[] { 10, 11, 12 });
+                Byte3 value = new Byte3((byte) 10, (byte) 11, (byte) 12);
                 imageA.set(i, j, value);
             }
         }
@@ -491,8 +533,9 @@ public class TestImages extends TornadoTestBase {
                 .transferToHost(DataTransferMode.EVERY_EXECUTION, imageB);
 
         ImmutableTaskGraph immutableTaskGraph = taskGraph.snapshot();
-        TornadoExecutionPlan executionPlan = new TornadoExecutionPlan(immutableTaskGraph);
-        executionPlan.execute();
+        try (TornadoExecutionPlan executionPlan = new TornadoExecutionPlan(immutableTaskGraph)) {
+            executionPlan.execute();
+        }
 
         for (int i = 0; i < M; i++) {
             for (int j = 0; j < N; j++) {
@@ -505,7 +548,7 @@ public class TestImages extends TornadoTestBase {
     }
 
     @Test
-    public void testImageFloat13() {
+    public void testImageFloat13() throws TornadoExecutionPlanException {
 
         final int M = 16;
         final int N = 2048;
@@ -516,7 +559,7 @@ public class TestImages extends TornadoTestBase {
 
         for (int i = 0; i < M; i++) {
             for (int j = 0; j < N; j++) {
-                Byte3 value = new Byte3(new byte[] { 10, 11, 12 });
+                Byte3 value = new Byte3((byte) 10, (byte) 11, (byte) 12);
                 imageA.set(i, j, value);
             }
         }
@@ -527,8 +570,9 @@ public class TestImages extends TornadoTestBase {
                 .transferToHost(DataTransferMode.EVERY_EXECUTION, imageB);
 
         ImmutableTaskGraph immutableTaskGraph = taskGraph.snapshot();
-        TornadoExecutionPlan executionPlan = new TornadoExecutionPlan(immutableTaskGraph);
-        executionPlan.execute();
+        try (TornadoExecutionPlan executionPlan = new TornadoExecutionPlan(immutableTaskGraph)) {
+            executionPlan.execute();
+        }
 
         for (int i = 0; i < M; i++) {
             for (int j = 0; j < N; j++) {
@@ -541,7 +585,7 @@ public class TestImages extends TornadoTestBase {
     }
 
     @Test
-    public void testImageFloat14() {
+    public void testImageFloat14() throws TornadoExecutionPlanException {
 
         final int M = 64;
         final int N = 64;
@@ -552,7 +596,7 @@ public class TestImages extends TornadoTestBase {
 
         for (int i = 0; i < M; i++) {
             for (int j = 0; j < N; j++) {
-                Byte4 value = new Byte4(new byte[] { 10, 11, 12, 13 });
+                Byte4 value = new Byte4((byte) 10, (byte) 11, (byte) 12, (byte) 13);
                 imageA.set(i, j, value);
             }
         }
@@ -563,8 +607,9 @@ public class TestImages extends TornadoTestBase {
                 .transferToHost(DataTransferMode.EVERY_EXECUTION, imageB);
 
         ImmutableTaskGraph immutableTaskGraph = taskGraph.snapshot();
-        TornadoExecutionPlan executionPlan = new TornadoExecutionPlan(immutableTaskGraph);
-        executionPlan.execute();
+        try (TornadoExecutionPlan executionPlan = new TornadoExecutionPlan(immutableTaskGraph)) {
+            executionPlan.execute();
+        }
 
         for (int i = 0; i < M; i++) {
             for (int j = 0; j < N; j++) {
@@ -578,7 +623,7 @@ public class TestImages extends TornadoTestBase {
     }
 
     @Test
-    public void testImageFloat15() {
+    public void testImageFloat15() throws TornadoExecutionPlanException {
 
         final int M = 32;
         final int N = 1024;
@@ -589,7 +634,7 @@ public class TestImages extends TornadoTestBase {
 
         for (int i = 0; i < M; i++) {
             for (int j = 0; j < N; j++) {
-                Byte4 value = new Byte4(new byte[] { 10, 11, 12, 13 });
+                Byte4 value = new Byte4((byte) 10, (byte) 11, (byte) 12, (byte) 13);
                 imageA.set(i, j, value);
             }
         }
@@ -600,8 +645,9 @@ public class TestImages extends TornadoTestBase {
                 .transferToHost(DataTransferMode.EVERY_EXECUTION, imageB);
 
         ImmutableTaskGraph immutableTaskGraph = taskGraph.snapshot();
-        TornadoExecutionPlan executionPlan = new TornadoExecutionPlan(immutableTaskGraph);
-        executionPlan.execute();
+        try (TornadoExecutionPlan executionPlan = new TornadoExecutionPlan(immutableTaskGraph)) {
+            executionPlan.execute();
+        }
 
         for (int i = 0; i < M; i++) {
             for (int j = 0; j < N; j++) {
@@ -613,5 +659,136 @@ public class TestImages extends TornadoTestBase {
             }
         }
     }
+
+    @Test
+    public void testImageFloat16() throws TornadoExecutionPlanException {
+
+        final int M = 64;
+        final int N = 64;
+
+        final int base = 10;
+
+        final ImageFloat imageA = new ImageFloat(M, N);
+        final ImageFloat imageB = new ImageFloat(M, N);
+        imageA.fill(base);
+
+        final TaskGraph taskGraph = new TaskGraph("testLoop") //
+                .transferToDevice(DataTransferMode.EVERY_EXECUTION, imageA) //
+                .task("image", TestImages::testCopyImagesParallel, imageA, imageB)//
+                .transferToHost(DataTransferMode.EVERY_EXECUTION, imageB);
+
+        ImmutableTaskGraph immutableTaskGraph = taskGraph.snapshot();
+        try (TornadoExecutionPlan executionPlan = new TornadoExecutionPlan(immutableTaskGraph)) {
+
+            // Execute 10000 times
+            int iteration = 0;
+            while (iteration < 10000) {
+                executionPlan.execute();
+
+                // Check result
+                for (int i = 0; i < M; i++) {
+                    for (int j = 0; j < N; j++) {
+                        assertEquals((11 + iteration), imageB.get(i, j), 0.1f);
+                    }
+                }
+
+                // Set the new array
+                for (int i = 0; i < M; i++) {
+                    for (int j = 0; j < N; j++) {
+                        imageA.set(i, j, imageB.get(i, j));
+                    }
+                }
+                iteration++;
+            }
+        }
+    }
+
+    @Test
+    public void testImageFloat17() throws TornadoExecutionPlanException {
+
+        final int M = 64;
+        final int N = 64;
+
+        final int base = 10;
+
+        final ImageFloat imageA = new ImageFloat(M, N);
+        final ImageFloat imageB = new ImageFloat(M, N);
+        imageA.fill(base);
+
+        final TaskGraph taskGraph = new TaskGraph("testLoop") //
+                .transferToDevice(DataTransferMode.EVERY_EXECUTION, imageA) //
+                .task("image", TestImages::testCopyImagesSequential, imageA, imageB)//
+                .transferToHost(DataTransferMode.EVERY_EXECUTION, imageB);
+
+        ImmutableTaskGraph immutableTaskGraph = taskGraph.snapshot();
+        try (TornadoExecutionPlan executionPlan = new TornadoExecutionPlan(immutableTaskGraph)) {
+
+            // Execute 10000 times
+            int iteration = 0;
+            while (iteration < 10000) {
+                executionPlan.execute();
+
+                // Check result
+                for (int i = 0; i < M; i++) {
+                    for (int j = 0; j < N; j++) {
+                        assertEquals((11 + iteration), imageB.get(i, j), 0.1f);
+                    }
+                }
+
+                // Set the new array
+                for (int i = 0; i < M; i++) {
+                    for (int j = 0; j < N; j++) {
+                        imageA.set(i, j, imageB.get(i, j));
+                    }
+                }
+                iteration++;
+            }
+        }
+    }
+
+    @Test
+    public void testImageFloat18() throws TornadoExecutionPlanException {
+
+        final int M = 64;
+        final int N = 64;
+
+        float base = new Random().nextFloat();
+
+        final ImageFloat imageA = new ImageFloat(M, N);
+        final ImageFloat imageB = new ImageFloat(M, N);
+        imageA.fill(base);
+
+        final TaskGraph taskGraph = new TaskGraph("testLoop") //
+                .transferToDevice(DataTransferMode.EVERY_EXECUTION, imageA) //
+                .task("image", TestImages::testCopyImagesParallelRandom, imageA, imageB)//
+                .transferToHost(DataTransferMode.EVERY_EXECUTION, imageB);
+
+        ImmutableTaskGraph immutableTaskGraph = taskGraph.snapshot();
+        try (TornadoExecutionPlan executionPlan = new TornadoExecutionPlan(immutableTaskGraph)) {
+
+            // Execute 10000 times
+            int iteration = 0;
+            while (iteration < 10000) {
+                executionPlan.execute();
+
+                // Check result
+                for (int i = 0; i < M; i++) {
+                    for (int j = 0; j < N; j++) {
+                        assertEquals((base + 0.01f), imageB.get(i, j), 0.01f);
+                    }
+                }
+                base += 0.01f;
+
+                // Set the new array
+                for (int i = 0; i < M; i++) {
+                    for (int j = 0; j < N; j++) {
+                        imageA.set(i, j, imageB.get(i, j));
+                    }
+                }
+                iteration++;
+            }
+        }
+    }
+    // CHECKSTYLE:ON
 
 }

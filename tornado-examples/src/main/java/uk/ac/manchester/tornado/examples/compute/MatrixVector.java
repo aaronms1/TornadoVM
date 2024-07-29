@@ -1,12 +1,12 @@
 /*
- * Copyright (c) 2022, APT Group, Department of Computer Science,
+ * Copyright (c) 2013-2023, APT Group, Department of Computer Science,
  * The University of Manchester.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *    http://www.apache.org/licenses/LICENSE-2.0
+ * http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -26,9 +26,9 @@ import uk.ac.manchester.tornado.api.ImmutableTaskGraph;
 import uk.ac.manchester.tornado.api.TaskGraph;
 import uk.ac.manchester.tornado.api.TornadoExecutionPlan;
 import uk.ac.manchester.tornado.api.annotations.Parallel;
-import uk.ac.manchester.tornado.api.collections.types.Matrix2DFloat;
-import uk.ac.manchester.tornado.api.collections.types.VectorFloat;
 import uk.ac.manchester.tornado.api.enums.DataTransferMode;
+import uk.ac.manchester.tornado.api.types.collections.VectorFloat;
+import uk.ac.manchester.tornado.api.types.matrix.Matrix2DFloat;
 
 /**
  * Linear-Algebra example: Matrix-Vector.
@@ -37,8 +37,8 @@ import uk.ac.manchester.tornado.api.enums.DataTransferMode;
  * How to run?
  * </p>
  * <code>
- *     $ # To run with level-zero and SPIR-V
- *     $ tornado --jvm="-Dla.mv.device=0:0 -Dtornado.device.memory=24GB" -m tornado.examples/uk.ac.manchester.tornado.examples.compute.MatrixVector
+ * $ # To run with level-zero and SPIR-V
+ * $ tornado --jvm="-Dla.mv.device=0:0 -Dtornado.device.memory=24GB" -m tornado.examples/uk.ac.manchester.tornado.examples.compute.MatrixVector
  * </code>
  *
  * <p>
@@ -51,7 +51,7 @@ import uk.ac.manchester.tornado.api.enums.DataTransferMode;
  * Run with the profiler:
  * </p>
  * <code>
- *     $ tornado --enableProfiler console -m tornado.examples/uk.ac.manchester.tornado.examples.compute.MatrixVector
+ * $ tornado --enableProfiler console -m tornado.examples/uk.ac.manchester.tornado.examples.compute.MatrixVector
  * </code>
  *
  */
@@ -61,10 +61,10 @@ public class MatrixVector {
     public static final int MAX_ITERATIONS = 100;
 
     private static void computeMatrixVector(Matrix2DFloat matrix, VectorFloat vector, VectorFloat output) {
-        for (@Parallel int i = 0; i < vector.size(); i++) {
+        for (@Parallel int i = 0; i < matrix.getNumRows(); i++) {
             float sum = 0.0f;
             for (int j = 0; j < matrix.getNumColumns(); j++) {
-                sum += vector.get(i) * matrix.get(i, i);
+                sum += matrix.get(i, j) * vector.get(j);
             }
             output.set(i, sum);
         }
@@ -77,7 +77,8 @@ public class MatrixVector {
             try {
                 size = Integer.parseInt(args[0]);
             } catch (NumberFormatException numberFormatException) {
-                size = 8192;
+                numberFormatException.printStackTrace();
+                throw new NullPointerException();
             }
         }
 

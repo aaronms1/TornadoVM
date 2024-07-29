@@ -12,7 +12,7 @@
  *
  * This code is distributed in the hope that it will be useful, but WITHOUT
  * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
- * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License
  * version 2 for more details (a copy is included in the LICENSE file that
  * accompanied this code).
  *
@@ -30,7 +30,7 @@ import uk.ac.manchester.tornado.drivers.opencl.enums.OCLDeviceType;
 
 public interface OCLTargetDevice extends TornadoTargetDevice {
 
-    long getId();
+    long getDevicePointer();
 
     String getVersion();
 
@@ -48,6 +48,8 @@ public interface OCLTargetDevice extends TornadoTargetDevice {
 
     String getDeviceVendor();
 
+    String getDriverVersion();
+
     boolean isDeviceAvailable();
 
     String getDeviceOpenCLCVersion();
@@ -57,4 +59,8 @@ public interface OCLTargetDevice extends TornadoTargetDevice {
     OCLDeviceContextInterface getDeviceContext();
 
     void setDeviceContext(OCLDeviceContextInterface deviceContext);
+
+    int deviceVersion();
+
+    boolean isSPIRVSupported();
 }

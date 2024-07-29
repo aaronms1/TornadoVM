@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2020, APT Group, Department of Computer Science,
+ * Copyright (c) 2020, 2024, APT Group, Department of Computer Science,
  * School of Engineering, The University of Manchester. All rights reserved.
  * Copyright (c) 2018, 2020, APT Group, Department of Computer Science,
  * The University of Manchester. All rights reserved.
@@ -12,15 +12,13 @@
  *
  * This code is distributed in the hope that it will be useful, but WITHOUT
  * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
- * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License
  * version 2 for more details (a copy is included in the LICENSE file that
  * accompanied this code).
  *
  * You should have received a copy of the GNU General Public License version
  * 2 along with this work; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
- *
- *
  */
 package uk.ac.manchester.tornado.drivers.opencl.graal.compiler;
 
@@ -45,20 +43,23 @@ import org.graalvm.compiler.virtual.phases.ea.PartialEscapePhase;
 
 import jdk.vm.ci.meta.MetaAccessProvider;
 import uk.ac.manchester.tornado.api.TornadoDeviceContext;
-import uk.ac.manchester.tornado.drivers.opencl.graal.phases.TornadoNewArrayDevirtualizationReplacement;
+import uk.ac.manchester.tornado.drivers.common.compiler.phases.analysis.TornadoShapeAnalysis;
+import uk.ac.manchester.tornado.drivers.common.compiler.phases.guards.ExceptionSuppression;
+import uk.ac.manchester.tornado.drivers.common.compiler.phases.guards.TornadoValueTypeCleanup;
+import uk.ac.manchester.tornado.drivers.common.compiler.phases.memalloc.TornadoFieldAccessFixup;
+import uk.ac.manchester.tornado.drivers.common.compiler.phases.memalloc.TornadoLocalMemoryAllocation;
+import uk.ac.manchester.tornado.drivers.common.compiler.phases.memalloc.TornadoNewArrayDevirtualizationReplacement;
+import uk.ac.manchester.tornado.drivers.common.compiler.phases.memalloc.TornadoPrivateArrayPiRemoval;
+import uk.ac.manchester.tornado.drivers.opencl.graal.phases.TornadoBatchGlobalIndexOffset;
+import uk.ac.manchester.tornado.drivers.opencl.graal.phases.TornadoHalfFloatReplacement;
 import uk.ac.manchester.tornado.drivers.opencl.graal.phases.TornadoOpenCLIntrinsicsReplacements;
 import uk.ac.manchester.tornado.drivers.opencl.graal.phases.TornadoParallelScheduler;
 import uk.ac.manchester.tornado.drivers.opencl.graal.phases.TornadoTaskSpecialisation;
 import uk.ac.manchester.tornado.runtime.common.TornadoOptions;
 import uk.ac.manchester.tornado.runtime.graal.compiler.TornadoHighTier;
-import uk.ac.manchester.tornado.runtime.graal.phases.ExceptionSuppression;
-import uk.ac.manchester.tornado.runtime.graal.phases.TornadoFieldAccessFixup;
-import uk.ac.manchester.tornado.runtime.graal.phases.TornadoFullInliningPolicy;
 import uk.ac.manchester.tornado.runtime.graal.phases.TornadoInliningPolicy;
-import uk.ac.manchester.tornado.runtime.graal.phases.TornadoLocalMemoryAllocation;
-import uk.ac.manchester.tornado.runtime.graal.phases.TornadoPartialInliningPolicy;
-import uk.ac.manchester.tornado.runtime.graal.phases.TornadoShapeAnalysis;
-import uk.ac.manchester.tornado.runtime.graal.phases.TornadoValueTypeCleanup;
+import uk.ac.manchester.tornado.runtime.graal.phases.sketcher.TornadoFullInliningPolicy;
+import uk.ac.manchester.tornado.runtime.graal.phases.sketcher.TornadoPartialInliningPolicy;
 
 public class OCLHighTier extends TornadoHighTier {
 
@@ -77,8 +78,8 @@ public class OCLHighTier extends TornadoHighTier {
                 appendPhase(new IterativeConditionalEliminationPhase(canonicalizer, false));
             }
         }
-
         appendPhase(new TornadoTaskSpecialisation(canonicalizer));
+        appendPhase(new TornadoBatchGlobalIndexOffset());
         appendPhase(new TornadoFieldAccessFixup());
         appendPhase(canonicalizer);
         appendPhase(new DeadCodeEliminationPhase(Optional));
@@ -87,9 +88,14 @@ public class OCLHighTier extends TornadoHighTier {
 
         appendPhase(new TornadoNewArrayDevirtualizationReplacement());
 
+        appendPhase(new TornadoHalfFloatReplacement());
+
         if (PartialEscapeAnalysis.getValue(options)) {
             appendPhase(new PartialEscapePhase(true, canonicalizer, options));
         }
+
+        appendPhase(new TornadoPrivateArrayPiRemoval());
+
         appendPhase(new TornadoValueTypeCleanup());
 
         if (OptConvertDeoptsToGuards.getValue(options)) {
@@ -99,6 +105,7 @@ public class OCLHighTier extends TornadoHighTier {
         appendPhase(new TornadoShapeAnalysis());
         appendPhase(canonicalizer);
         appendPhase(new TornadoParallelScheduler());
+
         appendPhase(new SchedulePhase(SchedulePhase.SchedulingStrategy.EARLIEST));
 
         if (!deviceContext.isPlatformFPGA()) {

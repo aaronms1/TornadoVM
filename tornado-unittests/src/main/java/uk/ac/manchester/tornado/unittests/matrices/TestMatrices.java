@@ -6,7 +6,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *    http://www.apache.org/licenses/LICENSE-2.0
+ * http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -33,6 +33,7 @@ import uk.ac.manchester.tornado.api.TaskGraph;
 import uk.ac.manchester.tornado.api.TornadoExecutionPlan;
 import uk.ac.manchester.tornado.api.annotations.Parallel;
 import uk.ac.manchester.tornado.api.enums.DataTransferMode;
+import uk.ac.manchester.tornado.api.exceptions.TornadoExecutionPlanException;
 import uk.ac.manchester.tornado.unittests.common.TornadoTestBase;
 
 /**
@@ -40,11 +41,12 @@ import uk.ac.manchester.tornado.unittests.common.TornadoTestBase;
  * How to run?
  * </p>
  * <code>
- *     tornado-test -V uk.ac.manchester.tornado.unittests.matrices.TestMatrices
+ * tornado-test -V uk.ac.manchester.tornado.unittests.matrices.TestMatrices
  * </code>
  */
 @Ignore
 public class TestMatrices extends TornadoTestBase {
+    // CHECKSTYLE:OFF
 
     public static void fillMatrix(int[][] values) {
         for (@Parallel int i = 0; i < values.length; i++) {
@@ -147,9 +149,33 @@ public class TestMatrices extends TornadoTestBase {
         }
     }
 
+    public static void copyMatrix2D(final float[][] matrixA, final float[][] matrixB) {
+        for (@Parallel int i = 0; i < matrixA.length; i++) {
+            for (int j = 0; j < matrixA[i].length; j++) {
+                matrixB[i][j] = matrixA[i][j];
+            }
+        }
+    }
+
+    public static void testAdd(long[][] matrix) {
+        for (@Parallel int i = 0; i < matrix.length; i++) {
+            for (int j = 0; j < matrix[i].length; j++) {
+                matrix[i][j] = matrix[i][j] + i;
+            }
+        }
+    }
+
+    public static void testAddMultiple(float[][] first, float[][] second) {
+        for (@Parallel int i = 0; i < first.length; i++) {
+            for (@Parallel int j = 0; j < first.length; j++) {
+                first[i][j] = first[i][j] + second[i][j];
+            }
+        }
+    }
+
     @Ignore
     @Test
-    public void testFillMatrix() {
+    public void testFillMatrix() throws TornadoExecutionPlanException {
         final int numElements = 16;
         int[][] a = new int[numElements][numElements];
 
@@ -158,8 +184,9 @@ public class TestMatrices extends TornadoTestBase {
                 .transferToHost(DataTransferMode.EVERY_EXECUTION, new Object[] { a });
 
         ImmutableTaskGraph immutableTaskGraph = taskGraph.snapshot();
-        TornadoExecutionPlan executionPlan = new TornadoExecutionPlan(immutableTaskGraph);
-        executionPlan.withWarmUp().execute();
+        try (TornadoExecutionPlan executionPlan = new TornadoExecutionPlan(immutableTaskGraph)) {
+            executionPlan.withWarmUp().execute();
+        }
 
         for (int i = 0; i < a.length; i++) {
             for (int j = 0; j < a[i].length; j++) {
@@ -169,7 +196,7 @@ public class TestMatrices extends TornadoTestBase {
     }
 
     @Test
-    public void testFillMatrix2() {
+    public void testFillMatrix2() throws TornadoExecutionPlanException {
 
         final int numElements = 4;
         int[][] a = new int[numElements][numElements];
@@ -179,8 +206,9 @@ public class TestMatrices extends TornadoTestBase {
                 .transferToHost(DataTransferMode.EVERY_EXECUTION, new Object[] { a });
 
         ImmutableTaskGraph immutableTaskGraph = taskGraph.snapshot();
-        TornadoExecutionPlan executionPlan = new TornadoExecutionPlan(immutableTaskGraph);
-        executionPlan.execute();
+        try (TornadoExecutionPlan executionPlan = new TornadoExecutionPlan(immutableTaskGraph)) {
+            executionPlan.execute();
+        }
 
         for (int i = 0; i < a.length; i++) {
             for (int j = 0; j < a[i].length; j++) {
@@ -190,7 +218,7 @@ public class TestMatrices extends TornadoTestBase {
     }
 
     @Test
-    public void testFillMatrix3() {
+    public void testFillMatrix3() throws TornadoExecutionPlanException {
 
         final int numElements = 16;
         int[][] a = new int[numElements][numElements];
@@ -200,8 +228,9 @@ public class TestMatrices extends TornadoTestBase {
                 .transferToHost(DataTransferMode.EVERY_EXECUTION, new Object[] { a }); //
 
         ImmutableTaskGraph immutableTaskGraph = taskGraph.snapshot();
-        TornadoExecutionPlan executionPlan = new TornadoExecutionPlan(immutableTaskGraph);
-        executionPlan.withWarmUp().execute();
+        try (TornadoExecutionPlan executionPlan = new TornadoExecutionPlan(immutableTaskGraph)) {
+            executionPlan.withWarmUp().execute();
+        }
 
         for (int i = 0; i < a.length; i++) {
             for (int j = 0; j < a[i].length; j++) {
@@ -211,7 +240,7 @@ public class TestMatrices extends TornadoTestBase {
     }
 
     @Test
-    public void testMatrixVectorSmall() {
+    public void testMatrixVectorSmall() throws TornadoExecutionPlanException {
         final int N = 4;
         float[] matrix = new float[N * N];
         float[] vector = new float[N];
@@ -232,8 +261,9 @@ public class TestMatrices extends TornadoTestBase {
                 .transferToHost(DataTransferMode.EVERY_EXECUTION, result);
 
         ImmutableTaskGraph immutableTaskGraph = taskGraph.snapshot();
-        TornadoExecutionPlan executionPlan = new TornadoExecutionPlan(immutableTaskGraph);
-        executionPlan.execute();
+        try (TornadoExecutionPlan executionPlan = new TornadoExecutionPlan(immutableTaskGraph)) {
+            executionPlan.execute();
+        }
 
         matrixVector(matrix, vector, resultSeq, N);
 
@@ -243,7 +273,7 @@ public class TestMatrices extends TornadoTestBase {
     }
 
     @Test
-    public void testMatrixVector() {
+    public void testMatrixVector() throws TornadoExecutionPlanException {
         final int N = 256;
         float[] matrix = new float[N * N];
         float[] vector = new float[N];
@@ -264,8 +294,9 @@ public class TestMatrices extends TornadoTestBase {
                 .transferToHost(DataTransferMode.EVERY_EXECUTION, result);
 
         ImmutableTaskGraph immutableTaskGraph = taskGraph.snapshot();
-        TornadoExecutionPlan executionPlan = new TornadoExecutionPlan(immutableTaskGraph);
-        executionPlan.execute();
+        try (TornadoExecutionPlan executionPlan = new TornadoExecutionPlan(immutableTaskGraph)) {
+            executionPlan.execute();
+        }
 
         matrixVector(matrix, vector, resultSeq, N);
 
@@ -275,7 +306,7 @@ public class TestMatrices extends TornadoTestBase {
     }
 
     @Test
-    public void testMatrixInit1DSmall() {
+    public void testMatrixInit1DSmall() throws TornadoExecutionPlanException {
         final int N = 4;
         float[] matrix = new float[N * N];
         float[] resultSeq = new float[N * N];
@@ -285,8 +316,9 @@ public class TestMatrices extends TornadoTestBase {
                 .transferToHost(DataTransferMode.EVERY_EXECUTION, matrix); //
 
         ImmutableTaskGraph immutableTaskGraph = taskGraph.snapshot();
-        TornadoExecutionPlan executionPlan = new TornadoExecutionPlan(immutableTaskGraph);
-        executionPlan.execute();
+        try (TornadoExecutionPlan executionPlan = new TornadoExecutionPlan(immutableTaskGraph)) {
+            executionPlan.execute();
+        }
 
         matrixInit1D(resultSeq, N);
 
@@ -296,7 +328,7 @@ public class TestMatrices extends TornadoTestBase {
     }
 
     @Test
-    public void testMatrixInit1D() {
+    public void testMatrixInit1D() throws TornadoExecutionPlanException {
         final int N = 256;
         float[] matrix = new float[N * N];
         float[] resultSeq = new float[N * N];
@@ -306,8 +338,9 @@ public class TestMatrices extends TornadoTestBase {
                 .transferToHost(DataTransferMode.EVERY_EXECUTION, matrix); //
 
         ImmutableTaskGraph immutableTaskGraph = taskGraph.snapshot();
-        TornadoExecutionPlan executionPlan = new TornadoExecutionPlan(immutableTaskGraph);
-        executionPlan.execute();
+        try (TornadoExecutionPlan executionPlan = new TornadoExecutionPlan(immutableTaskGraph)) {
+            executionPlan.execute();
+        }
 
         matrixInit1D(resultSeq, N);
 
@@ -317,7 +350,7 @@ public class TestMatrices extends TornadoTestBase {
     }
 
     @Test
-    public void testMatrixInit2DSmall() {
+    public void testMatrixInit2DSmall() throws TornadoExecutionPlanException {
         final int N = 4;
         float[] matrix = new float[N * N];
         float[] resultSeq = new float[N * N];
@@ -327,8 +360,9 @@ public class TestMatrices extends TornadoTestBase {
                 .transferToHost(DataTransferMode.EVERY_EXECUTION, matrix); //
 
         ImmutableTaskGraph immutableTaskGraph = taskGraph.snapshot();
-        TornadoExecutionPlan executionPlan = new TornadoExecutionPlan(immutableTaskGraph);
-        executionPlan.execute();
+        try (TornadoExecutionPlan executionPlan = new TornadoExecutionPlan(immutableTaskGraph)) {
+            executionPlan.execute();
+        }
 
         matrixInit2D(resultSeq, N);
 
@@ -338,7 +372,7 @@ public class TestMatrices extends TornadoTestBase {
     }
 
     @Test
-    public void testMatrixInit2D() {
+    public void testMatrixInit2D() throws TornadoExecutionPlanException {
         final int N = 1024;
         float[] matrix = new float[N * N];
         float[] resultSeq = new float[N * N];
@@ -348,8 +382,9 @@ public class TestMatrices extends TornadoTestBase {
                 .transferToHost(DataTransferMode.EVERY_EXECUTION, matrix); //
 
         ImmutableTaskGraph immutableTaskGraph = taskGraph.snapshot();
-        TornadoExecutionPlan executionPlan = new TornadoExecutionPlan(immutableTaskGraph);
-        executionPlan.execute();
+        try (TornadoExecutionPlan executionPlan = new TornadoExecutionPlan(immutableTaskGraph)) {
+            executionPlan.execute();
+        }
 
         matrixInit2D(resultSeq, N);
 
@@ -359,7 +394,7 @@ public class TestMatrices extends TornadoTestBase {
     }
 
     @Test
-    public void testMatrixAddition1DSmall() {
+    public void testMatrixAddition1DSmall() throws TornadoExecutionPlanException {
         final int N = 4;
         float[] matrixA = new float[N * N];
         float[] matrixB = new float[N * N];
@@ -380,8 +415,9 @@ public class TestMatrices extends TornadoTestBase {
                 .transferToHost(DataTransferMode.EVERY_EXECUTION, result); //
 
         ImmutableTaskGraph immutableTaskGraph = taskGraph.snapshot();
-        TornadoExecutionPlan executionPlan = new TornadoExecutionPlan(immutableTaskGraph);
-        executionPlan.execute();
+        try (TornadoExecutionPlan executionPlan = new TornadoExecutionPlan(immutableTaskGraph)) {
+            executionPlan.execute();
+        }
 
         matrixAddition1D(matrixA, matrixB, resultSeq, N);
 
@@ -391,7 +427,7 @@ public class TestMatrices extends TornadoTestBase {
     }
 
     @Test
-    public void testMatrixAddition1D() {
+    public void testMatrixAddition1D() throws TornadoExecutionPlanException {
         final int N = 1024;
         float[] matrixA = new float[N * N];
         float[] matrixB = new float[N * N];
@@ -412,8 +448,9 @@ public class TestMatrices extends TornadoTestBase {
                 .transferToHost(DataTransferMode.EVERY_EXECUTION, result); //
 
         ImmutableTaskGraph immutableTaskGraph = taskGraph.snapshot();
-        TornadoExecutionPlan executionPlan = new TornadoExecutionPlan(immutableTaskGraph);
-        executionPlan.execute();
+        try (TornadoExecutionPlan executionPlan = new TornadoExecutionPlan(immutableTaskGraph)) {
+            executionPlan.execute();
+        }
 
         matrixAddition1D(matrixA, matrixB, resultSeq, N);
 
@@ -423,7 +460,7 @@ public class TestMatrices extends TornadoTestBase {
     }
 
     @Test
-    public void testMatrixAddition2DSmall() {
+    public void testMatrixAddition2DSmall() throws TornadoExecutionPlanException {
         final int N = 4;
         float[] matrixA = new float[N * N];
         float[] matrixB = new float[N * N];
@@ -444,8 +481,9 @@ public class TestMatrices extends TornadoTestBase {
                 .transferToHost(DataTransferMode.EVERY_EXECUTION, result);
 
         ImmutableTaskGraph immutableTaskGraph = taskGraph.snapshot();
-        TornadoExecutionPlan executionPlan = new TornadoExecutionPlan(immutableTaskGraph);
-        executionPlan.execute();
+        try (TornadoExecutionPlan executionPlan = new TornadoExecutionPlan(immutableTaskGraph)) {
+            executionPlan.execute();
+        }
 
         matrixAddition2D(matrixA, matrixB, resultSeq, N);
 
@@ -455,7 +493,7 @@ public class TestMatrices extends TornadoTestBase {
     }
 
     @Test
-    public void testMatrixAddition2D() {
+    public void testMatrixAddition2D() throws TornadoExecutionPlanException {
         final int N = 1024;
         float[] matrixA = new float[N * N];
         float[] matrixB = new float[N * N];
@@ -476,8 +514,9 @@ public class TestMatrices extends TornadoTestBase {
                 .transferToHost(DataTransferMode.EVERY_EXECUTION, result);
 
         ImmutableTaskGraph immutableTaskGraph = taskGraph.snapshot();
-        TornadoExecutionPlan executionPlan = new TornadoExecutionPlan(immutableTaskGraph);
-        executionPlan.execute();
+        try (TornadoExecutionPlan executionPlan = new TornadoExecutionPlan(immutableTaskGraph)) {
+            executionPlan.execute();
+        }
 
         matrixAddition2D(matrixA, matrixB, resultSeq, N);
 
@@ -486,16 +525,8 @@ public class TestMatrices extends TornadoTestBase {
         }
     }
 
-    public static void copyMatrix2D(final float[][] matrixA, final float[][] matrixB) {
-        for (@Parallel int i = 0; i < matrixA.length; i++) {
-            for (int j = 0; j < matrixA[i].length; j++) {
-                matrixB[i][j] = matrixA[i][j];
-            }
-        }
-    }
-
     @Test
-    public void testCopyMatrix2D() {
+    public void testCopyMatrix2D() throws TornadoExecutionPlanException {
 
         final int N = 32;
         float[][] matrixA = new float[N][N];
@@ -514,8 +545,9 @@ public class TestMatrices extends TornadoTestBase {
                 .transferToHost(DataTransferMode.EVERY_EXECUTION, new float[][][] { matrixB });
 
         ImmutableTaskGraph immutableTaskGraph = taskGraph.snapshot();
-        TornadoExecutionPlan executionPlan = new TornadoExecutionPlan(immutableTaskGraph);
-        executionPlan.execute();
+        try (TornadoExecutionPlan executionPlan = new TornadoExecutionPlan(immutableTaskGraph)) {
+            executionPlan.execute();
+        }
 
         for (int i = 0; i < N; i++) {
             for (int j = 0; j < N; j++) {
@@ -525,7 +557,7 @@ public class TestMatrices extends TornadoTestBase {
     }
 
     @Test
-    public void testMatrixMultiplicationSmall() {
+    public void testMatrixMultiplicationSmall() throws TornadoExecutionPlanException {
         final int N = 32;
         float[] matrixA = new float[N * N];
         float[] matrixB = new float[N * N];
@@ -544,8 +576,9 @@ public class TestMatrices extends TornadoTestBase {
                 .transferToHost(DataTransferMode.EVERY_EXECUTION, matrixC);
 
         ImmutableTaskGraph immutableTaskGraph = taskGraph.snapshot();
-        TornadoExecutionPlan executionPlan = new TornadoExecutionPlan(immutableTaskGraph);
-        executionPlan.execute();
+        try (TornadoExecutionPlan executionPlan = new TornadoExecutionPlan(immutableTaskGraph)) {
+            executionPlan.execute();
+        }
 
         for (int i = 0; i < N; i++) {
             for (int j = 0; j < N; j++) {
@@ -565,7 +598,7 @@ public class TestMatrices extends TornadoTestBase {
     }
 
     @Test
-    public void testMatrixMultiplication() {
+    public void testMatrixMultiplication() throws TornadoExecutionPlanException {
         final int N = 256;
         float[] matrixA = new float[N * N];
         float[] matrixB = new float[N * N];
@@ -584,8 +617,9 @@ public class TestMatrices extends TornadoTestBase {
                 .transferToHost(DataTransferMode.EVERY_EXECUTION, matrixC);
 
         ImmutableTaskGraph immutableTaskGraph = taskGraph.snapshot();
-        TornadoExecutionPlan executionPlan = new TornadoExecutionPlan(immutableTaskGraph);
-        executionPlan.execute();
+        try (TornadoExecutionPlan executionPlan = new TornadoExecutionPlan(immutableTaskGraph)) {
+            executionPlan.execute();
+        }
 
         for (int i = 0; i < N; i++) {
             for (int j = 0; j < N; j++) {
@@ -605,7 +639,7 @@ public class TestMatrices extends TornadoTestBase {
     }
 
     @Test
-    public void testParallelInductionVariablesAsBounds() {
+    public void testParallelInductionVariablesAsBounds() throws TornadoExecutionPlanException {
         final int N = 256;
         float[] matrixA = new float[N * N];
         float[] matrixB = new float[N * N];
@@ -624,8 +658,9 @@ public class TestMatrices extends TornadoTestBase {
                 .transferToHost(DataTransferMode.EVERY_EXECUTION, matrixC);
 
         ImmutableTaskGraph immutableTaskGraph = taskGraph.snapshot();
-        TornadoExecutionPlan executionPlan = new TornadoExecutionPlan(immutableTaskGraph);
-        executionPlan.execute();
+        try (TornadoExecutionPlan executionPlan = new TornadoExecutionPlan(immutableTaskGraph)) {
+            executionPlan.execute();
+        }
 
         matrixMultiplicationParallelInduction(matrixA, matrixB, resultSeq, N);
 
@@ -637,7 +672,7 @@ public class TestMatrices extends TornadoTestBase {
     }
 
     @Test
-    public void testMultipleParallelInductionVariableLoopUsage() {
+    public void testMultipleParallelInductionVariableLoopUsage() throws TornadoExecutionPlanException {
         final int N = 256;
         float[] matrixA = new float[N * N];
         float[] matrixB = new float[N * N];
@@ -656,8 +691,9 @@ public class TestMatrices extends TornadoTestBase {
                 .transferToHost(DataTransferMode.EVERY_EXECUTION, matrixC); //
 
         ImmutableTaskGraph immutableTaskGraph = taskGraph.snapshot();
-        TornadoExecutionPlan executionPlan = new TornadoExecutionPlan(immutableTaskGraph);
-        executionPlan.execute();
+        try (TornadoExecutionPlan executionPlan = new TornadoExecutionPlan(immutableTaskGraph)) {
+            executionPlan.execute();
+        }
 
         matrixUsageOfParallelInduction(matrixA, matrixB, resultSeq, N);
 
@@ -668,16 +704,8 @@ public class TestMatrices extends TornadoTestBase {
         }
     }
 
-    public static void testAdd(long[][] matrix) {
-        for (@Parallel int i = 0; i < matrix.length; i++) {
-            for (int j = 0; j < matrix[i].length; j++) {
-                matrix[i][j] = matrix[i][j] + i;
-            }
-        }
-    }
-
     @Test
-    public void testAddMatrix() {
+    public void testAddMatrix() throws TornadoExecutionPlanException {
 
         int N = 128;
         Random random = new Random();
@@ -705,24 +733,17 @@ public class TestMatrices extends TornadoTestBase {
                 .transferToHost(DataTransferMode.EVERY_EXECUTION, new long[][][] { matrix });
 
         ImmutableTaskGraph immutableTaskGraph = taskGraph.snapshot();
-        TornadoExecutionPlan executionPlan = new TornadoExecutionPlan(immutableTaskGraph);
-        executionPlan.execute();
+        try (TornadoExecutionPlan executionPlan = new TornadoExecutionPlan(immutableTaskGraph)) {
+            executionPlan.execute();
+        }
 
         for (int i = 0; i < matrix.length; i++) {
             Assert.assertArrayEquals(matrixSeq[i], matrix[i]);
         }
     }
 
-    public static void testAddMultiple(float[][] first, float[][] second) {
-        for (@Parallel int i = 0; i < first.length; i++) {
-            for (@Parallel int j = 0; j < first.length; j++) {
-                first[i][j] = first[i][j] + second[i][j];
-            }
-        }
-    }
-
     @Test
-    public void testAddMatrixMultiple() {
+    public void testAddMatrixMultiple() throws TornadoExecutionPlanException {
 
         int N = 128;
         Random random = new Random();
@@ -755,12 +776,13 @@ public class TestMatrices extends TornadoTestBase {
                 .transferToHost(DataTransferMode.EVERY_EXECUTION, new float[][][] { firstMatrix });
 
         ImmutableTaskGraph immutableTaskGraph = taskGraph.snapshot();
-        TornadoExecutionPlan executionPlan = new TornadoExecutionPlan(immutableTaskGraph);
-        executionPlan.execute();
+        try (TornadoExecutionPlan executionPlan = new TornadoExecutionPlan(immutableTaskGraph)) {
+            executionPlan.execute();
+        }
 
         for (int i = 0; i < firstMatrix.length; i++) {
             Assert.assertArrayEquals(firstMatrixSeq[i], firstMatrix[i], 0.01f);
         }
     }
-
+    // CHECKSTYLE:ON
 }

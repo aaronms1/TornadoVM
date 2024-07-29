@@ -12,15 +12,13 @@
  *
  * This code is distributed in the hope that it will be useful, but WITHOUT
  * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
- * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License
  * version 2 for more details (a copy is included in the LICENSE file that
  * accompanied this code).
  *
  * You should have received a copy of the GNU General Public License version
  * 2 along with this work; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
- *
- * Authors: James Clarkson
  *
  */
 package uk.ac.manchester.tornado.drivers.opencl.graal.nodes;
@@ -47,57 +45,16 @@ import uk.ac.manchester.tornado.api.exceptions.TornadoInternalError;
 import uk.ac.manchester.tornado.drivers.opencl.graal.lir.OCLArithmeticTool;
 import uk.ac.manchester.tornado.drivers.opencl.graal.lir.OCLBuiltinTool;
 import uk.ac.manchester.tornado.drivers.opencl.graal.lir.OCLLIRStmt.AssignStmt;
-import uk.ac.manchester.tornado.runtime.graal.phases.MarkIntIntrinsicNode;
+import uk.ac.manchester.tornado.runtime.graal.nodes.interfaces.MarkIntIntrinsicNode;
 
 @NodeInfo(nameTemplate = "{p#operation/s}")
 public class OCLIntBinaryIntrinsicNode extends BinaryNode implements ArithmeticLIRLowerable, MarkIntIntrinsicNode {
 
+    public static final NodeClass<OCLIntBinaryIntrinsicNode> TYPE = NodeClass.create(OCLIntBinaryIntrinsicNode.class);
+    protected final Operation operation;
     protected OCLIntBinaryIntrinsicNode(ValueNode x, ValueNode y, Operation op, JavaKind kind) {
         super(TYPE, StampFactory.forKind(kind), x, y);
         this.operation = op;
-    }
-
-    public static final NodeClass<OCLIntBinaryIntrinsicNode> TYPE = NodeClass.create(OCLIntBinaryIntrinsicNode.class);
-    protected final Operation operation;
-
-    @Override
-    public String getOperation() {
-        return operation.toString();
-    }
-
-    //@formatter:off
-    public enum Operation {
-        ABS_DIFF, 
-        ABS_SAT, 
-        HADD, 
-        RHADD, 
-        MAX, 
-        MIN, 
-        MUL_HI, 
-        ROTATE, 
-        SUB_SAT, 
-        UPSAMPLE, 
-        MUL24
-    }
-    //@formatter:on
-
-    @Override
-    public ValueNode canonical(CanonicalizerTool tool) {
-        return canonical(tool, getX(), getY());
-    }
-
-    @Override
-    public Stamp foldStamp(Stamp stampX, Stamp stampY) {
-        return stamp(NodeView.DEFAULT);
-    }
-
-    @Override
-    public void generate(NodeLIRBuilderTool tool) {
-        generate(tool, tool.getLIRGeneratorTool().getArithmetic());
-    }
-
-    public Operation operation() {
-        return operation;
     }
 
     public static ValueNode create(ValueNode x, ValueNode y, Operation op, JavaKind kind) {
@@ -122,28 +79,7 @@ public class OCLIntBinaryIntrinsicNode extends BinaryNode implements ArithmeticL
         }
         return result;
     }
-
-    @Override
-    public void generate(NodeLIRBuilderTool builder, ArithmeticLIRGeneratorTool lirGen) {
-        OCLBuiltinTool gen = ((OCLArithmeticTool) lirGen).getGen().getOCLBuiltinTool();
-        Value x = builder.operand(getX());
-        Value y = builder.operand(getY());
-        Value result;
-        switch (operation()) {
-            case MIN:
-                result = gen.genIntMin(x, y);
-                break;
-            case MAX:
-                result = gen.genIntMax(x, y);
-                break;
-            default:
-                throw shouldNotReachHere();
-        }
-        Variable var = builder.getLIRGeneratorTool().newVariable(result.getValueKind());
-        builder.getLIRGeneratorTool().append(new AssignStmt(var, result));
-        builder.setResult(this, var);
-
-    }
+    //@formatter:on
 
     private static long doCompute(long x, long y, Operation op) {
         switch (op) {
@@ -168,12 +104,73 @@ public class OCLIntBinaryIntrinsicNode extends BinaryNode implements ArithmeticL
     }
 
     @Override
+    public String getOperation() {
+        return operation.toString();
+    }
+
+    @Override
+    public ValueNode canonical(CanonicalizerTool tool) {
+        return canonical(tool, getX(), getY());
+    }
+
+    @Override
+    public Stamp foldStamp(Stamp stampX, Stamp stampY) {
+        return stamp(NodeView.DEFAULT);
+    }
+
+    @Override
+    public void generate(NodeLIRBuilderTool tool) {
+        generate(tool, tool.getLIRGeneratorTool().getArithmetic());
+    }
+
+    public Operation operation() {
+        return operation;
+    }
+
+    @Override
+    public void generate(NodeLIRBuilderTool builder, ArithmeticLIRGeneratorTool lirGen) {
+        OCLBuiltinTool gen = ((OCLArithmeticTool) lirGen).getGen().getOCLBuiltinTool();
+        Value x = builder.operand(getX());
+        Value y = builder.operand(getY());
+        Value result;
+        switch (operation()) {
+            case MIN:
+                result = gen.genIntMin(x, y);
+                break;
+            case MAX:
+                result = gen.genIntMax(x, y);
+                break;
+            default:
+                throw shouldNotReachHere();
+        }
+        Variable var = builder.getLIRGeneratorTool().newVariable(result.getValueKind());
+        builder.getLIRGeneratorTool().append(new AssignStmt(var, result));
+        builder.setResult(this, var);
+
+    }
+
+    @Override
     public ValueNode canonical(CanonicalizerTool tool, ValueNode x, ValueNode y) {
         ValueNode c = tryConstantFold(x, y, operation(), getStackKind());
         if (c != null) {
             return c;
         }
         return this;
+    }
+
+    //@formatter:off
+    public enum Operation {
+        ABS_DIFF,
+        ABS_SAT,
+        HADD,
+        RHADD,
+        MAX,
+        MIN,
+        MUL_HI,
+        ROTATE,
+        SUB_SAT,
+        UPSAMPLE,
+        MUL24
     }
 
 }

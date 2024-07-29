@@ -2,7 +2,7 @@
  * This file is part of Tornado: A heterogeneous programming framework:
  * https://github.com/beehive-lab/tornadovm
  *
- * Copyright (c) 2023, APT Group, Department of Computer Science, The University
+ * Copyright (c) 2023, 2024, APT Group, Department of Computer Science, The University
  * of Manchester. All rights reserved. DO NOT ALTER OR REMOVE COPYRIGHT NOTICES
  * OR THIS FILE HEADER.
  *
@@ -18,8 +18,6 @@
  * You should have received a copy of the GNU General Public License version 2
  * along with this work; if not, write to the Free Software Foundation, Inc., 51
  * Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
- *
- *
  */
 package uk.ac.manchester.tornado.drivers.ptx.graal;
 
@@ -31,6 +29,7 @@ public enum PTXVariablePrefix {
      */
     // @formatter:off
         B8("b8", "rub"),
+        B16("b16", "rbh"),
         B32("b32", "rui"),
         B64("b64", "rbd"),
         S8("s8", "rsb"),
@@ -39,6 +38,7 @@ public enum PTXVariablePrefix {
         S64("s64", "rsd"),
         U32("u32", "rui"),
         U64("u64", "rud"),
+        F16("f16", "rfh"),
         F32("f32", "rfi"),
         F64("f64", "rfd"),
         PRED("pred", "rpb");
@@ -51,9 +51,9 @@ public enum PTXVariablePrefix {
      * It constructs a PTXVariablePrefix enum with the specified type and prefix.
      *
      * @param type
-     *            The type string.
+     *     The type string.
      * @param prefix
-     *            The prefix string.
+     *     The prefix string.
      */
     PTXVariablePrefix(String type, String prefix) {
         this.type = type;

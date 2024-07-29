@@ -1,51 +1,27 @@
 /*
- * This file is part of Tornado: A heterogeneous programming framework:
- * https://github.com/beehive-lab/tornadovm
+ * Copyright (c) 2013-2023, APT Group, Department of Computer Science,
+ * The University of Manchester.
  *
- * Copyright (c) 2023, APT Group, Department of Computer Science,
- * The University of Manchester. All rights reserved.
- * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
  *
- * GNU Classpath is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2, or (at your option)
- * any later version.
+ * http://www.apache.org/licenses/LICENSE-2.0
  *
- * GNU Classpath is distributed in the hope that it will be useful, but
- * WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- * General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with GNU Classpath; see the file COPYING.  If not, write to the
- * Free Software Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
- * 02110-1301 USA.
- *
- * Linking this library statically or dynamically with other modules is
- * making a combined work based on this library.  Thus, the terms and
- * conditions of the GNU General Public License cover the whole
- * combination.
- *
- * As a special exception, the copyright holders of this library give you
- * permission to link this library with independent modules to produce an
- * executable, regardless of the license terms of these independent
- * modules, and to copy and distribute the resulting executable under
- * terms of your choice, provided that you also meet, for each linked
- * independent module, the terms and conditions of the license of that
- * module.  An independent module is a module which is not derived from
- * or based on this library.  If you modify this library, you may extend
- * this exception to your version of the library, but you are not
- * obligated to do so.  If you do not wish to do so, delete this
- * exception statement from your version.
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  *
  */
 package uk.ac.manchester.tornado.api;
 
 import java.util.Collection;
-import java.util.Objects;
 
 import uk.ac.manchester.tornado.api.common.TornadoDevice;
 import uk.ac.manchester.tornado.api.enums.ProfilerMode;
+import uk.ac.manchester.tornado.api.runtime.ExecutorFrame;
 
 /**
  * A {@link TaskGraph} is encapsulated in this class and all actions over a task
@@ -69,28 +45,20 @@ public class ImmutableTaskGraph {
         this.taskGraph = taskGraph;
     }
 
-    void execute() {
-        this.taskGraph.execute();
-    }
-
-    void execute(GridScheduler gridScheduler) {
-        taskGraph.execute(gridScheduler);
-    }
-
-    void executeWithDynamicReconfiguration(Policy policy, DRMode mode) {
-        if (Objects.requireNonNull(mode) == DRMode.SERIAL) {
-            taskGraph.executeWithProfilerSequential(policy);
-        } else if (mode == DRMode.PARALLEL) {
-            taskGraph.executeWithProfiler(policy);
-        }
+    void execute(ExecutorFrame executionPackage) {
+        this.taskGraph.execute(executionPackage);
     }
 
     void warmup() {
         taskGraph.warmup();
     }
 
-    void setDevice(TornadoDevice device) {
-        taskGraph.setDevice(device);
+    void withDevice(TornadoDevice device) {
+        taskGraph.withDevice(device);
+    }
+
+    void withDevice(String taskName, TornadoDevice device) {
+        taskGraph.withDevice(taskName, device);
     }
 
     void freeDeviceMemory() {
@@ -99,6 +67,10 @@ public class ImmutableTaskGraph {
 
     void transferToHost(Object... objects) {
         taskGraph.syncRuntimeTransferToHost(objects);
+    }
+
+    void transferToHost(Object object, long offset, long partialCopySize) {
+        taskGraph.syncRuntimeTransferToHost(object, offset, partialCopySize);
     }
 
     long getTotalTime() {
@@ -141,6 +113,14 @@ public class ImmutableTaskGraph {
         return taskGraph.getDeviceKernelTime();
     }
 
+    long getTotalBytesCopyIn() {
+        return taskGraph.getTotalBytesCopyIn();
+    }
+
+    long getTotalBytesCopyOut() {
+        return taskGraph.getTotalBytesCopyOut();
+    }
+
     String getProfileLog() {
         return taskGraph.getProfileLog();
     }
@@ -154,19 +134,27 @@ public class ImmutableTaskGraph {
     }
 
     void resetDevice() {
-        taskGraph.getDevice().reset();
+        taskGraph.getDevice().clean();
     }
 
     void clearProfiles() {
         taskGraph.clearProfiles();
     }
 
-    void useDefaultScheduler(boolean useDefaultScheduler) {
+    void withDefaultScheduler(boolean useDefaultScheduler) {
         taskGraph.useDefaultThreadScheduler(useDefaultScheduler);
     }
 
     void withBatch(String batchSize) {
         taskGraph.batch(batchSize);
+    }
+
+    void withMemoryLimit(String memoryLimit) {
+        taskGraph.withMemoryLimit(memoryLimit);
+    }
+
+    void withoutMemoryLimit() {
+        taskGraph.withoutMemoryLimit();
     }
 
     TornadoDevice getDevice() {
@@ -183,5 +171,45 @@ public class ImmutableTaskGraph {
 
     void disableProfiler(ProfilerMode profilerMode) {
         taskGraph.disableProfiler(profilerMode);
+    }
+
+    void withConcurrentDevices() {
+        taskGraph.withConcurrentDevices();
+    }
+
+    void withoutConcurrentDevices() {
+        taskGraph.withoutConcurrentDevices();
+    }
+
+    void withThreadInfo() {
+        taskGraph.withThreadInfo();
+    }
+
+    void withoutThreadInfo() {
+        taskGraph.withoutThreadInfo();
+    }
+
+    void withPrintKernel() {
+        taskGraph.withPrintKernel();
+    }
+
+    void withoutPrintKernel() {
+        taskGraph.withoutPrintKernel();
+    }
+
+    void withGridScheduler(GridScheduler gridScheduler) {
+        taskGraph.withGridScheduler(gridScheduler);
+    }
+
+    long getTotalBytesTransferred() {
+        return taskGraph.getTotalBytesTransferred();
+    }
+
+    long getTotalDeviceMemoryUsage() {
+        return taskGraph.getTotalDeviceMemoryUsage();
+    }
+
+    long getCurrentDeviceMemoryUsage() {
+        return taskGraph.getCurrentDeviceMemoryUsage();
     }
 }

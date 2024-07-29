@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2020, APT Group, Department of Computer Science,
+ * Copyright (c) 2020, 2024, APT Group, Department of Computer Science,
  * School of Engineering, The University of Manchester. All rights reserved.
  * Copyright (c) 2009, 2017, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
@@ -10,7 +10,7 @@
  *
  * This code is distributed in the hope that it will be useful, but WITHOUT
  * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
- * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License
  * version 2 for more details (a copy is included in the LICENSE file that
  * accompanied this code).
  *
@@ -52,14 +52,11 @@ import uk.ac.manchester.tornado.drivers.ptx.graal.lir.PTXVectorElementSelect;
 public abstract class VectorElementOpNode extends FloatingNode implements LIRLowerable, Comparable<VectorElementOpNode> {
 
     public static final NodeClass<VectorElementOpNode> TYPE = NodeClass.create(VectorElementOpNode.class);
-
+    private final PTXKind ptxKind;
     @Input(InputType.Extension)
     ValueNode vector;
-
     @Input
     ValueNode lane;
-
-    private final PTXKind ptxKind;;
 
     protected VectorElementOpNode(NodeClass<? extends VectorElementOpNode> c, PTXKind kind, ValueNode vector, ValueNode lane) {
         super(c, StampFactory.forKind(kind.asJavaKind()));
@@ -73,8 +70,8 @@ public abstract class VectorElementOpNode extends FloatingNode implements LIRLow
             final PTXStamp vectorStamp = (PTXStamp) vector.stamp(NodeView.DEFAULT);
             vectorKind = vectorStamp.getPTXKind();
             guarantee(vectorKind.isVector(), "Cannot apply vector operation to non-vector type: %s", vectorKind);
-        } else if (vstamp instanceof ObjectStamp) {
-            ObjectStamp ostamp = (ObjectStamp) vector.stamp(NodeView.DEFAULT);
+        } else if (vstamp instanceof ObjectStamp objectStamp) {
+            ObjectStamp ostamp = objectStamp;
 
             if (ostamp.type() != null) {
                 vectorKind = PTXKind.fromResolvedJavaType(ostamp.type());
@@ -96,9 +93,13 @@ public abstract class VectorElementOpNode extends FloatingNode implements LIRLow
         return updateStamp(StampFactory.forKind(ptxKind.asJavaKind()));
     }
 
-    final public int laneId() {
+    public final int laneId() {
         guarantee(lane instanceof ConstantNode, "Invalid lane: %s", lane);
         return (lane instanceof ConstantNode) ? lane.asJavaConstant().asInt() : -1;
+    }
+
+    public final ValueNode getLaneId() {
+        return this.lane;
     }
 
     public ValueNode getVector() {

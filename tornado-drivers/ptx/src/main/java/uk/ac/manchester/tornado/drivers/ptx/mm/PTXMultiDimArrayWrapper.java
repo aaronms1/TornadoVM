@@ -1,5 +1,5 @@
 /*
- * This file is part of Tornado: A heterogeneous programming framework: 
+ * This file is part of Tornado: A heterogeneous programming framework:
  * https://github.com/beehive-lab/tornadovm
  *
  * Copyright (c) 2021, APT Group, Department of Computer Science,
@@ -12,7 +12,7 @@
  *
  * This code is distributed in the hope that it will be useful, but WITHOUT
  * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
- * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License
  * version 2 for more details (a copy is included in the LICENSE file that
  * accompanied this code).
  *
@@ -23,23 +23,24 @@
  */
 package uk.ac.manchester.tornado.drivers.ptx.mm;
 
-import static uk.ac.manchester.tornado.runtime.common.Tornado.fatal;
-
 import java.lang.reflect.Array;
+import java.util.Arrays;
 import java.util.function.Function;
 
 import jdk.vm.ci.meta.JavaKind;
 import uk.ac.manchester.tornado.api.exceptions.TornadoMemoryException;
 import uk.ac.manchester.tornado.api.exceptions.TornadoOutOfMemoryException;
 import uk.ac.manchester.tornado.drivers.ptx.PTXDeviceContext;
+import uk.ac.manchester.tornado.runtime.common.TornadoLogger;
 
 public class PTXMultiDimArrayWrapper<T, E> extends PTXArrayWrapper<T> {
 
     private final Function<PTXDeviceContext, ? extends PTXArrayWrapper<E>> innerWrapperFactory;
     private final PTXLongArrayWrapper tableWrapper;
+    private final PTXDeviceContext deviceContext;
     private long[] addresses;
     private PTXArrayWrapper<E>[] wrappers;
-    private final PTXDeviceContext deviceContext;
+    private long setSubRegionSize;
 
     public PTXMultiDimArrayWrapper(PTXDeviceContext device, Function<PTXDeviceContext, ? extends PTXArrayWrapper<E>> factory, long batchSize) {
         this(device, factory);
@@ -68,6 +69,26 @@ public class PTXMultiDimArrayWrapper<T, E> extends PTXArrayWrapper<T> {
     }
 
     @Override
+    public long getSizeSubRegionSize() {
+        return setSubRegionSize;
+    }
+
+    @Override
+    public void setSizeSubRegion(long batchSize) {
+        this.setSubRegionSize = batchSize;
+    }
+
+    @Override
+    public int[] getIntBuffer() {
+        return super.getIntBuffer();
+    }
+
+    @Override
+    public void setIntBuffer(int[] arr) {
+        super.setIntBuffer(arr);
+    }
+
+    @Override
     public void allocate(Object value, long batchSize) throws TornadoOutOfMemoryException, TornadoMemoryException {
 
         if (batchSize > 0) {
@@ -92,40 +113,38 @@ public class PTXMultiDimArrayWrapper<T, E> extends PTXArrayWrapper<T> {
                 addresses[i] = wrappers[i].toBuffer();
             }
         } catch (TornadoOutOfMemoryException | TornadoMemoryException e) {
-            fatal("OOM: multi-dim array: %s", e.getMessage());
+            new TornadoLogger().fatal("OOM: multi-dim array: %s", e.getMessage());
             System.exit(-1);
         }
     }
 
     @Override
-    public void deallocate() throws TornadoMemoryException {
+    public void markAsFreeBuffer() throws TornadoMemoryException {
         deallocateElements();
-        tableWrapper.deallocate();
+        tableWrapper.markAsFreeBuffer();
         wrappers = null;
         addresses = null;
     }
 
     private void deallocateElements() {
-        for (int i = 0; i < wrappers.length; i++) {
-            wrappers[i].deallocate();
-        }
+        Arrays.stream(wrappers).forEach(PTXArrayWrapper::markAsFreeBuffer);
     }
 
-    private int writeElements(T values) {
+    private int writeElements(long executionPlanId, T values) {
         final E[] elements = innerCast(values);
         for (int i = 0; i < elements.length; i++) {
-            wrappers[i].enqueueWrite(elements[i], 0, 0, null, false);
+            wrappers[i].enqueueWrite(executionPlanId, elements[i], 0, 0, null, false);
         }
-        return deviceContext.enqueueBarrier();
+        return deviceContext.enqueueBarrier(executionPlanId);
     }
 
-    private int readElements(T values) {
+    private int readElements(long executionPlanId, T values) {
         final E[] elements = innerCast(values);
         // XXX: Offset is 0
         for (int i = 0; i < elements.length; i++) {
-            wrappers[i].enqueueRead(elements[i], 0, null, false);
+            wrappers[i].enqueueRead(executionPlanId, elements[i], 0, null, false);
         }
-        return deviceContext.enqueueBarrier();
+        return deviceContext.enqueueBarrier(executionPlanId);
     }
 
     @SuppressWarnings("unchecked")
@@ -134,31 +153,31 @@ public class PTXMultiDimArrayWrapper<T, E> extends PTXArrayWrapper<T> {
     }
 
     @Override
-    protected int enqueueReadArrayData(long address, long bytes, T value, long hostOffset, int[] waitEvents) {
-        return readElements(value);
+    protected int enqueueReadArrayData(long executionPlanId, long address, long bytes, T value, long hostOffset, int[] waitEvents) {
+        return readElements(executionPlanId, value);
     }
 
     @Override
-    protected int enqueueWriteArrayData(long address, long bytes, T value, long hostOffset, int[] waitEvents) {
+    protected int enqueueWriteArrayData(long executionPlanId, long address, long bytes, T value, long hostOffset, int[] waitEvents) {
         if (hostOffset > 0) {
             System.out.println("[WARNING] writing in offset 0");
         }
-        tableWrapper.enqueueWrite(addresses, 0, 0, null, false);
-        return writeElements(value);
+        tableWrapper.enqueueWrite(executionPlanId, addresses, 0, 0, null, false);
+        return writeElements(executionPlanId, value);
     }
 
     @Override
-    protected int readArrayData(long address, long bytes, T value, long hostOffset, int[] waitEvents) {
-        return readElements(value);
+    protected int readArrayData(long executionPlanId, long address, long bytes, T value, long hostOffset, int[] waitEvents) {
+        return readElements(executionPlanId, value);
     }
 
     @Override
-    protected void writeArrayData(long address, long bytes, T value, int hostOffset, int[] waitEvents) {
+    protected void writeArrayData(long executionPlanId, long address, long bytes, T value, int hostOffset, int[] waitEvents) {
         if (hostOffset > 0) {
             System.out.println("[WARNING] writing in offset 0");
         }
-        tableWrapper.enqueueWrite(addresses, 0, 0, null, false);
-        writeElements(value);
+        tableWrapper.enqueueWrite(executionPlanId, addresses, 0, 0, null, false);
+        writeElements(executionPlanId, value);
     }
 
 }

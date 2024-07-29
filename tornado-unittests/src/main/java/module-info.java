@@ -3,6 +3,8 @@ open module tornado.unittests {
     requires transitive tornado.api;
     requires lucene.core;
     requires java.desktop;
+    requires jdk.incubator.vector;
+    requires com.microsoft.onnxruntime;
 
     exports uk.ac.manchester.tornado.unittests;
     exports uk.ac.manchester.tornado.unittests.api;
@@ -29,7 +31,7 @@ open module tornado.unittests {
     exports uk.ac.manchester.tornado.unittests.prebuilt;
     exports uk.ac.manchester.tornado.unittests.profiler;
     exports uk.ac.manchester.tornado.unittests.reductions;
-    exports uk.ac.manchester.tornado.unittests.slam.graphics;
+    exports uk.ac.manchester.tornado.unittests.slam;
     exports uk.ac.manchester.tornado.unittests.tasks;
     exports uk.ac.manchester.tornado.unittests.temporary.values;
     exports uk.ac.manchester.tornado.unittests.tools;

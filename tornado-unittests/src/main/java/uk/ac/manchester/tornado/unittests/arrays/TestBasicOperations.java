@@ -6,7 +6,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *    http://www.apache.org/licenses/LICENSE-2.0
+ * http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -29,134 +29,141 @@ import uk.ac.manchester.tornado.api.TaskGraph;
 import uk.ac.manchester.tornado.api.TornadoExecutionPlan;
 import uk.ac.manchester.tornado.api.annotations.Parallel;
 import uk.ac.manchester.tornado.api.enums.DataTransferMode;
+import uk.ac.manchester.tornado.api.types.arrays.DoubleArray;
+import uk.ac.manchester.tornado.api.types.arrays.FloatArray;
+import uk.ac.manchester.tornado.api.types.arrays.IntArray;
+import uk.ac.manchester.tornado.api.types.arrays.LongArray;
+import uk.ac.manchester.tornado.api.types.arrays.ShortArray;
 import uk.ac.manchester.tornado.unittests.common.TornadoTestBase;
 
 /**
  * How to test?
  *
+ * <p>
  * <code>
- *     tornado-test -V --fast uk.ac.manchester.tornado.unittests.arrays.TestBasicOperations
+ * tornado-test -V --fast uk.ac.manchester.tornado.unittests.arrays.TestBasicOperations
  * </code>
+ * </p>
  */
 public class TestBasicOperations extends TornadoTestBase {
 
-    public static void vectorAddDouble(double[] a, double[] b, double[] c) {
-        for (@Parallel int i = 0; i < c.length; i++) {
-            c[i] = a[i] + b[i];
+    public static void vectorAddDouble(DoubleArray a, DoubleArray b, DoubleArray c) {
+        for (@Parallel int i = 0; i < c.getSize(); i++) {
+            c.set(i, a.get(i) + b.get(i));
         }
     }
 
-    public static void vectorSubDouble(double[] a, double[] b, double[] c) {
-        for (@Parallel int i = 0; i < c.length; i++) {
-            c[i] = a[i] - b[i];
+    public static void vectorSubDouble(DoubleArray a, DoubleArray b, DoubleArray c) {
+        for (@Parallel int i = 0; i < c.getSize(); i++) {
+            c.set(i, a.get(i) - b.get(i));
         }
     }
 
-    public static void vectorMulDouble(double[] a, double[] b, double[] c) {
-        for (@Parallel int i = 0; i < c.length; i++) {
-            c[i] = a[i] * b[i];
+    public static void vectorMulDouble(DoubleArray a, DoubleArray b, DoubleArray c) {
+        for (@Parallel int i = 0; i < c.getSize(); i++) {
+            c.set(i, a.get(i) * b.get(i));
         }
     }
 
-    public static void vectorDivDouble(double[] a, double[] b, double[] c) {
-        for (@Parallel int i = 0; i < c.length; i++) {
-            c[i] = a[i] / b[i];
+    public static void vectorDivDouble(DoubleArray a, DoubleArray b, DoubleArray c) {
+        for (@Parallel int i = 0; i < c.getSize(); i++) {
+            c.set(i, a.get(i) / b.get(i));
         }
     }
 
-    public static void vectorAddFloat(float[] a, float[] b, float[] c) {
-        for (@Parallel int i = 0; i < c.length; i++) {
-            c[i] = a[i] + b[i];
+    public static void vectorAddFloat(FloatArray a, FloatArray b, FloatArray c) {
+        for (@Parallel int i = 0; i < c.getSize(); i++) {
+            c.set(i, a.get(i) + b.get(i));
         }
     }
 
-    public static void vectorSubFloat(float[] a, float[] b, float[] c) {
-        for (@Parallel int i = 0; i < c.length; i++) {
-            c[i] = a[i] - b[i];
+    public static void vectorSubFloat(FloatArray a, FloatArray b, FloatArray c) {
+        for (@Parallel int i = 0; i < c.getSize(); i++) {
+            c.set(i, a.get(i) - b.get(i));
         }
     }
 
-    public static void vectorMulFloat(float[] a, float[] b, float[] c) {
-        for (@Parallel int i = 0; i < c.length; i++) {
-            c[i] = a[i] * b[i];
+    public static void vectorMulFloat(FloatArray a, FloatArray b, FloatArray c) {
+        for (@Parallel int i = 0; i < c.getSize(); i++) {
+            c.set(i, a.get(i) * b.get(i));
         }
     }
 
-    public static void vectorDivFloat(float[] a, float[] b, float[] c) {
-        for (@Parallel int i = 0; i < c.length; i++) {
-            c[i] = a[i] / b[i];
+    public static void vectorDivFloat(FloatArray a, FloatArray b, FloatArray c) {
+        for (@Parallel int i = 0; i < c.getSize(); i++) {
+            c.set(i, a.get(i) / b.get(i));
         }
     }
 
-    public static void vectorAddInteger(int[] a, int[] b, int[] c) {
-        for (@Parallel int i = 0; i < c.length; i++) {
-            c[i] = a[i] + b[i];
+    public static void vectorAddInteger(IntArray a, IntArray b, IntArray c) {
+        for (@Parallel int i = 0; i < c.getSize(); i++) {
+            c.set(i, a.get(i) + b.get(i));
         }
     }
 
-    public static void vectorSubInteger(int[] a, int[] b, int[] c) {
-        for (@Parallel int i = 0; i < c.length; i++) {
-            c[i] = a[i] - b[i];
+    public static void vectorSubInteger(IntArray a, IntArray b, IntArray c) {
+        for (@Parallel int i = 0; i < c.getSize(); i++) {
+            c.set(i, a.get(i) - b.get(i));
         }
     }
 
-    public static void vectorMulInteger(int[] a, int[] b, int[] c) {
-        for (@Parallel int i = 0; i < c.length; i++) {
-            c[i] = a[i] * b[i];
+    public static void vectorMulInteger(IntArray a, IntArray b, IntArray c) {
+        for (@Parallel int i = 0; i < c.getSize(); i++) {
+            c.set(i, a.get(i) * b.get(i));
         }
     }
 
-    public static void vectorDivInteger(int[] a, int[] b, int[] c) {
-        for (@Parallel int i = 0; i < c.length; i++) {
-            c[i] = a[i] / b[i];
+    public static void vectorDivInteger(IntArray a, IntArray b, IntArray c) {
+        for (@Parallel int i = 0; i < c.getSize(); i++) {
+            c.set(i, a.get(i) / b.get(i));
         }
     }
 
-    public static void vectorAddLong(long[] a, long[] b, long[] c) {
-        for (@Parallel int i = 0; i < c.length; i++) {
-            c[i] = a[i] + b[i];
+    public static void vectorAddLong(LongArray a, LongArray b, LongArray c) {
+        for (@Parallel int i = 0; i < c.getSize(); i++) {
+            c.set(i, a.get(i) + b.get(i));
         }
     }
 
-    public static void vectorSubLong(long[] a, long[] b, long[] c) {
-        for (@Parallel int i = 0; i < c.length; i++) {
-            c[i] = a[i] - b[i];
+    public static void vectorSubLong(LongArray a, LongArray b, LongArray c) {
+        for (@Parallel int i = 0; i < c.getSize(); i++) {
+            c.set(i, a.get(i) - b.get(i));
         }
     }
 
-    public static void vectorMulLong(long[] a, long[] b, long[] c) {
-        for (@Parallel int i = 0; i < c.length; i++) {
-            c[i] = a[i] * b[i];
+    public static void vectorMulLong(LongArray a, LongArray b, LongArray c) {
+        for (@Parallel int i = 0; i < c.getSize(); i++) {
+            c.set(i, a.get(i) * b.get(i));
         }
     }
 
-    public static void vectorDivLong(long[] a, long[] b, long[] c) {
-        for (@Parallel int i = 0; i < c.length; i++) {
-            c[i] = a[i] / b[i];
+    public static void vectorDivLong(LongArray a, LongArray b, LongArray c) {
+        for (@Parallel int i = 0; i < c.getSize(); i++) {
+            c.set(i, a.get(i) / b.get(i));
         }
     }
 
-    public static void vectorAddShort(short[] a, short[] b, short[] c) {
-        for (@Parallel int i = 0; i < c.length; i++) {
-            c[i] = (short) (a[i] + b[i]);
+    public static void vectorAddShort(ShortArray a, ShortArray b, ShortArray c) {
+        for (@Parallel int i = 0; i < c.getSize(); i++) {
+            c.set(i, (short) (a.get(i) + b.get(i)));
         }
     }
 
-    public static void vectorSubShort(short[] a, short[] b, short[] c) {
-        for (@Parallel int i = 0; i < c.length; i++) {
-            c[i] = (short) (a[i] - b[i]);
+    public static void vectorSubShort(ShortArray a, ShortArray b, ShortArray c) {
+        for (@Parallel int i = 0; i < c.getSize(); i++) {
+            c.set(i, (short) (a.get(i) - b.get(i)));
         }
     }
 
-    public static void vectorMulShort(short[] a, short[] b, short[] c) {
-        for (@Parallel int i = 0; i < c.length; i++) {
-            c[i] = (short) (a[i] * b[i]);
+    public static void vectorMulShort(ShortArray a, ShortArray b, ShortArray c) {
+        for (@Parallel int i = 0; i < c.getSize(); i++) {
+            c.set(i, (short) (a.get(i) * b.get(i)));
         }
     }
 
-    public static void vectorDivShort(short[] a, short[] b, short[] c) {
-        for (@Parallel int i = 0; i < c.length; i++) {
-            c[i] = (short) (a[i] / b[i]);
+    public static void vectorDivShort(ShortArray a, ShortArray b, ShortArray c) {
+        for (@Parallel int i = 0; i < c.getSize(); i++) {
+            c.set(i, (short) (a.get(i) / b.get(i)));
         }
     }
 
@@ -187,13 +194,13 @@ public class TestBasicOperations extends TornadoTestBase {
     @Test
     public void testVectorAdditionDouble() {
         final int numElements = 32;
-        double[] a = new double[numElements];
-        double[] b = new double[numElements];
-        double[] c = new double[numElements];
+        DoubleArray a = new DoubleArray(numElements);
+        DoubleArray b = new DoubleArray(numElements);
+        DoubleArray c = new DoubleArray(numElements);
 
         IntStream.range(0, numElements).sequential().forEach(i -> {
-            a[i] = (float) Math.random();
-            b[i] = (float) Math.random();
+            a.set(i, (float) Math.random());
+            b.set(i, (float) Math.random());
         });
 
         TaskGraph taskGraph = new TaskGraph("s0") //
@@ -205,21 +212,21 @@ public class TestBasicOperations extends TornadoTestBase {
         TornadoExecutionPlan executionPlan = new TornadoExecutionPlan(immutableTaskGraph);
         executionPlan.execute();
 
-        for (int i = 0; i < c.length; i++) {
-            assertEquals(a[i] + b[i], c[i], 0.01);
+        for (int i = 0; i < c.getSize(); i++) {
+            assertEquals(a.get(i) + b.get(i), c.get(i), 0.01);
         }
     }
 
     @Test
     public void testVectorSubtractionDouble() {
         final int numElements = 32;
-        double[] a = new double[numElements];
-        double[] b = new double[numElements];
-        double[] c = new double[numElements];
+        DoubleArray a = new DoubleArray(numElements);
+        DoubleArray b = new DoubleArray(numElements);
+        DoubleArray c = new DoubleArray(numElements);
 
         IntStream.range(0, numElements).sequential().forEach(i -> {
-            a[i] = (float) Math.random();
-            b[i] = (float) Math.random();
+            a.set(i, (float) Math.random());
+            b.set(i, (float) Math.random());
         });
 
         TaskGraph taskGraph = new TaskGraph("s0") //
@@ -231,21 +238,21 @@ public class TestBasicOperations extends TornadoTestBase {
         TornadoExecutionPlan executionPlan = new TornadoExecutionPlan(immutableTaskGraph);
         executionPlan.execute();
 
-        for (int i = 0; i < c.length; i++) {
-            assertEquals(a[i] - b[i], c[i], 0.01);
+        for (int i = 0; i < c.getSize(); i++) {
+            assertEquals(a.get(i) - b.get(i), c.get(i), 0.01);
         }
     }
 
     @Test
     public void testVectorMultiplicationDouble() {
         final int numElements = 32;
-        double[] a = new double[numElements];
-        double[] b = new double[numElements];
-        double[] c = new double[numElements];
+        DoubleArray a = new DoubleArray(numElements);
+        DoubleArray b = new DoubleArray(numElements);
+        DoubleArray c = new DoubleArray(numElements);
 
         IntStream.range(0, numElements).sequential().forEach(i -> {
-            a[i] = (float) Math.random();
-            b[i] = (float) Math.random();
+            a.set(i, (float) Math.random());
+            b.set(i, (float) Math.random());
         });
 
         TaskGraph taskGraph = new TaskGraph("s0") //
@@ -257,21 +264,21 @@ public class TestBasicOperations extends TornadoTestBase {
         TornadoExecutionPlan executionPlan = new TornadoExecutionPlan(immutableTaskGraph);
         executionPlan.execute();
 
-        for (int i = 0; i < c.length; i++) {
-            assertEquals(a[i] * b[i], c[i], 0.01);
+        for (int i = 0; i < c.getSize(); i++) {
+            assertEquals(a.get(i) * b.get(i), c.get(i), 0.01);
         }
     }
 
     @Test
     public void testVectorDivisionDouble() {
         final int numElements = 32;
-        double[] a = new double[numElements];
-        double[] b = new double[numElements];
-        double[] c = new double[numElements];
+        DoubleArray a = new DoubleArray(numElements);
+        DoubleArray b = new DoubleArray(numElements);
+        DoubleArray c = new DoubleArray(numElements);
 
         IntStream.range(0, numElements).sequential().forEach(i -> {
-            a[i] = (float) Math.random();
-            b[i] = (float) Math.random();
+            a.set(i, (float) Math.random());
+            b.set(i, (float) Math.random());
         });
 
         TaskGraph taskGraph = new TaskGraph("s0") //
@@ -283,21 +290,21 @@ public class TestBasicOperations extends TornadoTestBase {
         TornadoExecutionPlan executionPlan = new TornadoExecutionPlan(immutableTaskGraph);
         executionPlan.execute();
 
-        for (int i = 0; i < c.length; i++) {
-            assertEquals(a[i] / b[i], c[i], 0.01);
+        for (int i = 0; i < c.getSize(); i++) {
+            assertEquals(a.get(i) / b.get(i), c.get(i), 0.01);
         }
     }
 
     @Test
     public void testVectorAdditionFloat() {
         final int numElements = 32;
-        float[] a = new float[numElements];
-        float[] b = new float[numElements];
-        float[] c = new float[numElements];
+        FloatArray a = new FloatArray(numElements);
+        FloatArray b = new FloatArray(numElements);
+        FloatArray c = new FloatArray(numElements);
 
         IntStream.range(0, numElements).sequential().forEach(i -> {
-            a[i] = (float) Math.random();
-            b[i] = (float) Math.random();
+            a.set(i, (float) Math.random());
+            b.set(i, (float) Math.random());
         });
 
         TaskGraph taskGraph = new TaskGraph("s0") //
@@ -309,21 +316,21 @@ public class TestBasicOperations extends TornadoTestBase {
         TornadoExecutionPlan executionPlan = new TornadoExecutionPlan(immutableTaskGraph);
         executionPlan.execute();
 
-        for (int i = 0; i < c.length; i++) {
-            assertEquals(a[i] + b[i], c[i], 0.01f);
+        for (int i = 0; i < c.getSize(); i++) {
+            assertEquals(a.get(i) + b.get(i), c.get(i), 0.01f);
         }
     }
 
     @Test
     public void testVectorSubtractionFloat() {
         final int numElements = 32;
-        float[] a = new float[numElements];
-        float[] b = new float[numElements];
-        float[] c = new float[numElements];
+        FloatArray a = new FloatArray(numElements);
+        FloatArray b = new FloatArray(numElements);
+        FloatArray c = new FloatArray(numElements);
 
         IntStream.range(0, numElements).sequential().forEach(i -> {
-            a[i] = (float) Math.random();
-            b[i] = (float) Math.random();
+            a.set(i, (float) Math.random());
+            b.set(i, (float) Math.random());
         });
 
         TaskGraph taskGraph = new TaskGraph("s0") //
@@ -335,21 +342,21 @@ public class TestBasicOperations extends TornadoTestBase {
         TornadoExecutionPlan executionPlan = new TornadoExecutionPlan(immutableTaskGraph);
         executionPlan.execute();
 
-        for (int i = 0; i < c.length; i++) {
-            assertEquals(a[i] - b[i], c[i], 0.01f);
+        for (int i = 0; i < c.getSize(); i++) {
+            assertEquals(a.get(i) - b.get(i), c.get(i), 0.01f);
         }
     }
 
     @Test
     public void testVectorMultiplicationFloat() {
         final int numElements = 32;
-        float[] a = new float[numElements];
-        float[] b = new float[numElements];
-        float[] c = new float[numElements];
+        FloatArray a = new FloatArray(numElements);
+        FloatArray b = new FloatArray(numElements);
+        FloatArray c = new FloatArray(numElements);
 
         IntStream.range(0, numElements).sequential().forEach(i -> {
-            a[i] = (float) Math.random();
-            b[i] = (float) Math.random();
+            a.set(i, (float) Math.random());
+            b.set(i, (float) Math.random());
         });
 
         TaskGraph taskGraph = new TaskGraph("s0") //
@@ -361,21 +368,21 @@ public class TestBasicOperations extends TornadoTestBase {
         TornadoExecutionPlan executionPlan = new TornadoExecutionPlan(immutableTaskGraph);
         executionPlan.execute();
 
-        for (int i = 0; i < c.length; i++) {
-            assertEquals(a[i] * b[i], c[i], 0.01f);
+        for (int i = 0; i < c.getSize(); i++) {
+            assertEquals(a.get(i) * b.get(i), c.get(i), 0.01f);
         }
     }
 
     @Test
     public void testVectorDivisionFloat() {
         final int numElements = 32;
-        float[] a = new float[numElements];
-        float[] b = new float[numElements];
-        float[] c = new float[numElements];
+        FloatArray a = new FloatArray(numElements);
+        FloatArray b = new FloatArray(numElements);
+        FloatArray c = new FloatArray(numElements);
 
         IntStream.range(0, numElements).sequential().forEach(i -> {
-            a[i] = (float) Math.random();
-            b[i] = (float) Math.random();
+            a.set(i, (float) Math.random());
+            b.set(i, (float) Math.random());
         });
 
         TaskGraph taskGraph = new TaskGraph("s0") //
@@ -387,22 +394,22 @@ public class TestBasicOperations extends TornadoTestBase {
         TornadoExecutionPlan executionPlan = new TornadoExecutionPlan(immutableTaskGraph);
         executionPlan.execute();
 
-        for (int i = 0; i < c.length; i++) {
-            assertEquals(a[i] / b[i], c[i], 0.01f);
+        for (int i = 0; i < c.getSize(); i++) {
+            assertEquals(a.get(i) / b.get(i), c.get(i), 0.01f);
         }
     }
 
     @Test
     public void testVectorAdditionInteger() {
         final int numElements = 32;
-        int[] a = new int[numElements];
-        int[] b = new int[numElements];
-        int[] c = new int[numElements];
+        IntArray a = new IntArray(numElements);
+        IntArray b = new IntArray(numElements);
+        IntArray c = new IntArray(numElements);
 
         Random r = new Random();
         IntStream.range(0, numElements).sequential().forEach(i -> {
-            a[i] = r.nextInt();
-            b[i] = r.nextInt();
+            a.set(i, r.nextInt());
+            b.set(i, r.nextInt());
         });
 
         TaskGraph taskGraph = new TaskGraph("s0") //
@@ -414,22 +421,22 @@ public class TestBasicOperations extends TornadoTestBase {
         TornadoExecutionPlan executionPlan = new TornadoExecutionPlan(immutableTaskGraph);
         executionPlan.execute();
 
-        for (int i = 0; i < c.length; i++) {
-            assertEquals(a[i] + b[i], c[i]);
+        for (int i = 0; i < c.getSize(); i++) {
+            assertEquals(a.get(i) + b.get(i), c.get(i));
         }
     }
 
     @Test
     public void testVectorSubtractionInteger() {
         final int numElements = 32;
-        int[] a = new int[numElements];
-        int[] b = new int[numElements];
-        int[] c = new int[numElements];
+        IntArray a = new IntArray(numElements);
+        IntArray b = new IntArray(numElements);
+        IntArray c = new IntArray(numElements);
 
         Random r = new Random();
         IntStream.range(0, numElements).sequential().forEach(i -> {
-            a[i] = r.nextInt();
-            b[i] = r.nextInt();
+            a.set(i, r.nextInt());
+            b.set(i, r.nextInt());
         });
 
         TaskGraph taskGraph = new TaskGraph("s0") //
@@ -441,22 +448,22 @@ public class TestBasicOperations extends TornadoTestBase {
         TornadoExecutionPlan executionPlan = new TornadoExecutionPlan(immutableTaskGraph);
         executionPlan.execute();
 
-        for (int i = 0; i < c.length; i++) {
-            assertEquals(a[i] - b[i], c[i]);
+        for (int i = 0; i < c.getSize(); i++) {
+            assertEquals(a.get(i) - b.get(i), c.get(i));
         }
     }
 
     @Test
     public void testVectorMultiplicationInteger() {
         final int numElements = 32;
-        int[] a = new int[numElements];
-        int[] b = new int[numElements];
-        int[] c = new int[numElements];
+        IntArray a = new IntArray(numElements);
+        IntArray b = new IntArray(numElements);
+        IntArray c = new IntArray(numElements);
 
         Random r = new Random();
         IntStream.range(0, numElements).sequential().forEach(i -> {
-            a[i] = r.nextInt();
-            b[i] = r.nextInt();
+            a.set(i, r.nextInt());
+            b.set(i, r.nextInt());
         });
 
         TaskGraph taskGraph = new TaskGraph("s0") //
@@ -468,22 +475,22 @@ public class TestBasicOperations extends TornadoTestBase {
         TornadoExecutionPlan executionPlan = new TornadoExecutionPlan(immutableTaskGraph);
         executionPlan.execute();
 
-        for (int i = 0; i < c.length; i++) {
-            assertEquals(a[i] * b[i], c[i]);
+        for (int i = 0; i < c.getSize(); i++) {
+            assertEquals(a.get(i) * b.get(i), c.get(i));
         }
     }
 
     @Test
     public void testVectorDivisionInteger() {
         final int numElements = 32;
-        int[] a = new int[numElements];
-        int[] b = new int[numElements];
-        int[] c = new int[numElements];
+        IntArray a = new IntArray(numElements);
+        IntArray b = new IntArray(numElements);
+        IntArray c = new IntArray(numElements);
 
         Random r = new Random();
         IntStream.range(0, numElements).sequential().forEach(i -> {
-            a[i] = r.nextInt();
-            b[i] = r.nextInt();
+            a.set(i, r.nextInt());
+            b.set(i, r.nextInt());
         });
 
         TaskGraph taskGraph = new TaskGraph("s0") //
@@ -494,22 +501,22 @@ public class TestBasicOperations extends TornadoTestBase {
         TornadoExecutionPlan executionPlan = new TornadoExecutionPlan(immutableTaskGraph);
         executionPlan.execute();
 
-        for (int i = 0; i < c.length; i++) {
-            assertEquals(a[i] / b[i], c[i]);
+        for (int i = 0; i < c.getSize(); i++) {
+            assertEquals(a.get(i) / b.get(i), c.get(i));
         }
     }
 
     @Test
     public void testVectorAdditionLong() {
         final int numElements = 32;
-        long[] a = new long[numElements];
-        long[] b = new long[numElements];
-        long[] c = new long[numElements];
+        LongArray a = new LongArray(numElements);
+        LongArray b = new LongArray(numElements);
+        LongArray c = new LongArray(numElements);
 
         Random r = new Random();
         IntStream.range(0, numElements).parallel().forEach(i -> {
-            a[i] = r.nextLong();
-            b[i] = r.nextLong();
+            a.set(i, r.nextLong());
+            b.set(i, r.nextLong());
         });
 
         TaskGraph taskGraph = new TaskGraph("s0") //
@@ -521,22 +528,22 @@ public class TestBasicOperations extends TornadoTestBase {
         TornadoExecutionPlan executionPlan = new TornadoExecutionPlan(immutableTaskGraph);
         executionPlan.execute();
 
-        for (int i = 0; i < c.length; i++) {
-            assertEquals(a[i] + b[i], c[i]);
+        for (int i = 0; i < c.getSize(); i++) {
+            assertEquals(a.get(i) + b.get(i), c.get(i));
         }
     }
 
     @Test
     public void testVectorSubtractionLong() {
         final int numElements = 32;
-        long[] a = new long[numElements];
-        long[] b = new long[numElements];
-        long[] c = new long[numElements];
+        LongArray a = new LongArray(numElements);
+        LongArray b = new LongArray(numElements);
+        LongArray c = new LongArray(numElements);
 
         Random r = new Random();
         IntStream.range(0, numElements).parallel().forEach(i -> {
-            a[i] = r.nextLong();
-            b[i] = r.nextLong();
+            a.set(i, r.nextLong());
+            b.set(i, r.nextLong());
         });
 
         TaskGraph taskGraph = new TaskGraph("s0") //
@@ -548,22 +555,22 @@ public class TestBasicOperations extends TornadoTestBase {
         TornadoExecutionPlan executionPlan = new TornadoExecutionPlan(immutableTaskGraph);
         executionPlan.execute();
 
-        for (int i = 0; i < c.length; i++) {
-            assertEquals(a[i] - b[i], c[i]);
+        for (int i = 0; i < c.getSize(); i++) {
+            assertEquals(a.get(i) - b.get(i), c.get(i));
         }
     }
 
     @Test
     public void testVectorMultiplicationLong() {
         final int numElements = 32;
-        long[] a = new long[numElements];
-        long[] b = new long[numElements];
-        long[] c = new long[numElements];
+        LongArray a = new LongArray(numElements);
+        LongArray b = new LongArray(numElements);
+        LongArray c = new LongArray(numElements);
 
         Random r = new Random();
         IntStream.range(0, numElements).parallel().forEach(i -> {
-            a[i] = r.nextLong();
-            b[i] = r.nextLong();
+            a.set(i, r.nextLong());
+            b.set(i, r.nextLong());
         });
 
         TaskGraph taskGraph = new TaskGraph("s0") //
@@ -575,22 +582,22 @@ public class TestBasicOperations extends TornadoTestBase {
         TornadoExecutionPlan executionPlan = new TornadoExecutionPlan(immutableTaskGraph);
         executionPlan.execute();
 
-        for (int i = 0; i < c.length; i++) {
-            assertEquals(a[i] * b[i], c[i]);
+        for (int i = 0; i < c.getSize(); i++) {
+            assertEquals(a.get(i) * b.get(i), c.get(i));
         }
     }
 
     @Test
     public void testVectorDivisionLong() {
         final int numElements = 32;
-        long[] a = new long[numElements];
-        long[] b = new long[numElements];
-        long[] c = new long[numElements];
+        LongArray a = new LongArray(numElements);
+        LongArray b = new LongArray(numElements);
+        LongArray c = new LongArray(numElements);
 
         Random r = new Random();
         IntStream.range(0, numElements).parallel().forEach(i -> {
-            a[i] = r.nextLong();
-            b[i] = r.nextLong();
+            a.set(i, r.nextLong());
+            b.set(i, r.nextLong());
         });
 
         TaskGraph taskGraph = new TaskGraph("s0") //
@@ -602,21 +609,21 @@ public class TestBasicOperations extends TornadoTestBase {
         TornadoExecutionPlan executionPlan = new TornadoExecutionPlan(immutableTaskGraph);
         executionPlan.execute();
 
-        for (int i = 0; i < c.length; i++) {
-            assertEquals(a[i] / b[i], c[i]);
+        for (int i = 0; i < c.getSize(); i++) {
+            assertEquals(a.get(i) / b.get(i), c.get(i));
         }
     }
 
     @Test
     public void testVectorAdditionShort() {
         final int numElements = 32;
-        short[] a = new short[numElements];
-        short[] b = new short[numElements];
-        short[] c = new short[numElements];
+        ShortArray a = new ShortArray(numElements);
+        ShortArray b = new ShortArray(numElements);
+        ShortArray c = new ShortArray(numElements);
 
         IntStream.range(0, numElements).parallel().forEach(idx -> {
-            a[idx] = 20;
-            b[idx] = 34;
+            a.set(idx, (short) 20);
+            b.set(idx, (short) 34);
         });
 
         TaskGraph taskGraph = new TaskGraph("s0") //
@@ -627,21 +634,21 @@ public class TestBasicOperations extends TornadoTestBase {
         TornadoExecutionPlan executionPlan = new TornadoExecutionPlan(immutableTaskGraph);
         executionPlan.execute();
 
-        for (int i = 0; i < c.length; i++) {
-            assertEquals((short) (a[i] + b[i]), c[i]);
+        for (int i = 0; i < c.getSize(); i++) {
+            assertEquals((short) (a.get(i) + b.get(i)), c.get(i));
         }
     }
 
     @Test
     public void testVectorSubtractionShort() {
         final int numElements = 32;
-        short[] a = new short[numElements];
-        short[] b = new short[numElements];
-        short[] c = new short[numElements];
+        ShortArray a = new ShortArray(numElements);
+        ShortArray b = new ShortArray(numElements);
+        ShortArray c = new ShortArray(numElements);
 
         IntStream.range(0, numElements).parallel().forEach(idx -> {
-            a[idx] = 20;
-            b[idx] = 34;
+            a.set(idx, (short) 20);
+            a.set(idx, (short) 34);
         });
 
         TaskGraph taskGraph = new TaskGraph("s0") //
@@ -652,21 +659,21 @@ public class TestBasicOperations extends TornadoTestBase {
         TornadoExecutionPlan executionPlan = new TornadoExecutionPlan(immutableTaskGraph);
         executionPlan.execute();
 
-        for (int i = 0; i < c.length; i++) {
-            assertEquals((short) (a[i] - b[i]), c[i]);
+        for (int i = 0; i < c.getSize(); i++) {
+            assertEquals((short) (a.get(i) - b.get(i)), c.get(i));
         }
     }
 
     @Test
     public void testVectorMultiplicationShort() {
         final int numElements = 32;
-        short[] a = new short[numElements];
-        short[] b = new short[numElements];
-        short[] c = new short[numElements];
+        ShortArray a = new ShortArray(numElements);
+        ShortArray b = new ShortArray(numElements);
+        ShortArray c = new ShortArray(numElements);
 
         IntStream.range(0, numElements).parallel().forEach(idx -> {
-            a[idx] = 20;
-            b[idx] = 34;
+            a.set(idx, (short) 20);
+            a.set(idx, (short) 34);
         });
 
         TaskGraph taskGraph = new TaskGraph("s0") //
@@ -678,21 +685,21 @@ public class TestBasicOperations extends TornadoTestBase {
         TornadoExecutionPlan executionPlan = new TornadoExecutionPlan(immutableTaskGraph);
         executionPlan.execute();
 
-        for (int i = 0; i < c.length; i++) {
-            assertEquals((short) (a[i] * b[i]), c[i]);
+        for (int i = 0; i < c.getSize(); i++) {
+            assertEquals((short) (a.get(i) * b.get(i)), c.get(i));
         }
     }
 
     @Test
     public void testVectorDivisionShort() {
         final int numElements = 32;
-        short[] a = new short[numElements];
-        short[] b = new short[numElements];
-        short[] c = new short[numElements];
+        ShortArray a = new ShortArray(numElements);
+        ShortArray b = new ShortArray(numElements);
+        ShortArray c = new ShortArray(numElements);
 
         IntStream.range(0, numElements).parallel().forEach(idx -> {
-            a[idx] = 20;
-            b[idx] = 34;
+            a.set(idx, (short) 20);
+            b.set(idx, (short) 34);
         });
 
         TaskGraph taskGraph = new TaskGraph("s0") //
@@ -704,8 +711,8 @@ public class TestBasicOperations extends TornadoTestBase {
         TornadoExecutionPlan executionPlan = new TornadoExecutionPlan(immutableTaskGraph);
         executionPlan.execute();
 
-        for (int i = 0; i < c.length; i++) {
-            assertEquals((short) (a[i] / b[i]), c[i]);
+        for (int i = 0; i < c.getSize(); i++) {
+            assertEquals((short) (a.get(i) / b.get(i)), c.get(i));
         }
     }
 

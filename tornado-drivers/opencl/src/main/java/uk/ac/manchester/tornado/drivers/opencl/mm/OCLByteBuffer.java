@@ -1,5 +1,5 @@
 /*
- * This file is part of Tornado: A heterogeneous programming framework: 
+ * This file is part of Tornado: A heterogeneous programming framework:
  * https://github.com/beehive-lab/tornadovm
  *
  * Copyright (c) 2013-2020, APT Group, Department of Computer Science,
@@ -12,15 +12,13 @@
  *
  * This code is distributed in the hope that it will be useful, but WITHOUT
  * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
- * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License
  * version 2 for more details (a copy is included in the LICENSE file that
  * accompanied this code).
  *
  * You should have received a copy of the GNU General Public License version
  * 2 along with this work; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
- *
- * Authors: James Clarkson
  *
  */
 package uk.ac.manchester.tornado.drivers.opencl.mm;
@@ -29,7 +27,6 @@ import java.nio.ByteBuffer;
 
 import uk.ac.manchester.tornado.drivers.opencl.OCLDeviceContext;
 import uk.ac.manchester.tornado.runtime.common.RuntimeUtilities;
-import uk.ac.manchester.tornado.runtime.common.Tornado;
 
 /**
  * A buffer for inspecting data within an OpenCL device. It is not backed by any
@@ -44,7 +41,7 @@ public class OCLByteBuffer {
     private final long offset;
     protected ByteBuffer buffer;
 
-    public OCLByteBuffer(final OCLDeviceContext deviceContext, final long oclBufferId, final long offset, final long numBytes) {
+    public OCLByteBuffer(OCLDeviceContext deviceContext, final long oclBufferId, final long offset, final long numBytes) {
         this.deviceContext = deviceContext;
         this.oclBufferId = oclBufferId;
         this.bytes = numBytes;
@@ -57,61 +54,60 @@ public class OCLByteBuffer {
         return buffer;
     }
 
-    public void read() {
-        read(null);
+    public void read(long executionPlanId) {
+        read(executionPlanId, null);
     }
 
-    public void read(final int[] events) {
-        deviceContext.readBuffer(toBuffer(), offset, bytes, buffer.array(), 0, events);
+    public void read(long executionPlanId, final int[] events) {
+        deviceContext.readBuffer(executionPlanId, toBuffer(), offset, bytes, buffer.array(), 0, events);
     }
 
-    public int read(long fromBuffer, final int[] toArray) {
-        return deviceContext.readBuffer(fromBuffer, 0, toArray.length * 4, toArray, 0, null);
+    public int read(long executionPlanId, long fromBuffer, final int[] toArray) {
+        return deviceContext.readBuffer(executionPlanId, fromBuffer, 0, toArray.length * 4, toArray, 0, null);
     }
 
-    public int enqueueRead() {
-        return enqueueRead(null);
+    public int enqueueRead(long executionPlanId) {
+        return enqueueRead(executionPlanId, null);
     }
 
-    public int enqueueRead(final int[] events) {
-        return deviceContext.enqueueReadBuffer(toBuffer(), offset, bytes, buffer.array(), 0, events);
+    public int enqueueRead(long executionPlanId, final int[] events) {
+        return deviceContext.enqueueReadBuffer(executionPlanId, toBuffer(), offset, bytes, buffer.array(), 0, events);
     }
 
-    public void write() {
-        write(null);
+    public void write(long executionPlanId) {
+        write(executionPlanId, null);
     }
 
-    public void write(final int[] events) {
+    public void write(long executionPlanId, final int[] events) {
         // XXX: offset 0
-        deviceContext.writeBuffer(toBuffer(), offset, bytes, buffer.array(), 0, events);
+        deviceContext.writeBuffer(executionPlanId, toBuffer(), offset, bytes, buffer.array(), 0, events);
     }
 
-    public int enqueueWrite() {
-        return enqueueWrite(null);
+    public int enqueueWrite(long executionPlanId) {
+        return enqueueWrite(executionPlanId, null);
     }
 
-    public int enqueueWrite(final int[] events) {
-        // XXX: offset 0
-        return deviceContext.enqueueWriteBuffer(toBuffer(), offset, bytes, buffer.array(), 0, events);
+    public int enqueueWrite(long executionPlanId, final int[] events) {
+        return deviceContext.enqueueWriteBuffer(executionPlanId, toBuffer(), offset, bytes, buffer.array(), 0, events);
     }
 
     /**
      * Write from a specific buffer space.
-     * 
+     *
      * @param fromBuffer
-     *            buffer to enqueue
+     *     buffer to enqueue
      * @param array
-     *            integer array to copy to the device.
+     *     integer array to copy to the device.
      * @param events
-     *            list of events
+     *     list of events
      * @return event status
      */
-    public int enqueueWrite(long fromBuffer, final int[] array, final int offset, final int[] events) {
-        return deviceContext.enqueueWriteBuffer(fromBuffer, offset, BYTES_PER_INTEGER * array.length, array, 0, events);
+    public int enqueueWrite(long executionPlanId, long fromBuffer, final int[] array, final int offset, final int[] events) {
+        return deviceContext.enqueueWriteBuffer(executionPlanId, fromBuffer, offset, BYTES_PER_INTEGER * array.length, array, 0, events);
     }
 
-    public int enqueueRead(long fromBuffer, final int[] array, final int offset, final int[] events) {
-        return deviceContext.enqueueReadBuffer(fromBuffer, offset, BYTES_PER_INTEGER * array.length, array, 0, events);
+    public int enqueueRead(long executionPlanId, long fromBuffer, final int[] array, final int offset, final int[] events) {
+        return deviceContext.enqueueReadBuffer(executionPlanId, fromBuffer, offset, BYTES_PER_INTEGER * array.length, array, 0, events);
     }
 
     public void dump() {
@@ -120,8 +116,8 @@ public class OCLByteBuffer {
 
     public void dump(final int width) {
         buffer.position(buffer.capacity());
-        System.out.printf("Buffer  : capacity = %s, in use = %s, device = %s \n", RuntimeUtilities.humanReadableByteCount(bytes, true),
-                RuntimeUtilities.humanReadableByteCount(buffer.position(), true), deviceContext.getDevice().getDeviceName());
+        System.out.printf("Buffer  : capacity = %s, in use = %s, device = %s \n", RuntimeUtilities.humanReadableByteCount(bytes, true), RuntimeUtilities.humanReadableByteCount(buffer.position(),
+                true), deviceContext.getDevice().getDeviceName());
         for (int i = 0; i < buffer.position(); i += width) {
             for (int j = 0; j < Math.min(buffer.capacity() - i, width); j++) {
                 if (j % 2 == 0) {
@@ -293,7 +289,4 @@ public class OCLByteBuffer {
         return deviceContext.getMemoryManager().toAtomicAddress();
     }
 
-    public void zeroMemory() {
-        Tornado.warn("zero memory unimplemented");
-    }
 }

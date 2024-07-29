@@ -12,7 +12,7 @@
  *
  * This code is distributed in the hope that it will be useful, but WITHOUT
  * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
- * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License
  * version 2 for more details (a copy is included in the LICENSE file that
  * accompanied this code).
  *
@@ -90,12 +90,10 @@ public class TornadoVMBytecodeBuilder {
         } else if (node instanceof CopyInNode) {
             bitcodeASM.transferToDeviceOnce(((CopyInNode) node).getValue().getIndex(), dependencyBC, offset, batchSize);
         } else if (node instanceof AllocateNode) {
-            TornadoLogger.info("[%s]: Skipping deprecated node %s", getClass().getSimpleName(), AllocateNode.class.getSimpleName());
+            new TornadoLogger().info("[%s]: Skipping deprecated node %s", getClass().getSimpleName(), AllocateNode.class.getSimpleName());
         } else if (node instanceof CopyOutNode) {
             ObjectNode value = ((CopyOutNode) node).getValue().getValue();
-            if (value != null) {
-                bitcodeASM.transferToHost(value.getIndex(), dependencyBC, offset, batchSize);
-            }
+            bitcodeASM.transferToHost(value.getIndex(), dependencyBC, offset, batchSize);
         } else if (node instanceof StreamInNode) {
             bitcodeASM.transferToDeviceAlways(((StreamInNode) node).getValue().getIndex(), dependencyBC, offset, batchSize);
         } else if (node instanceof DeallocateNode) {
@@ -143,14 +141,19 @@ public class TornadoVMBytecodeBuilder {
         return bitcodeASM.position();
     }
 
+    public int getLastCopyOutPosition() {
+        return bitcodeASM.getLastCopyOutPosition();
+    }
+
     private static class TornadoVMBytecodeAssembler {
         private final ByteBuffer buffer;
+        private int lastCopyOutPosition;
 
         /**
          * It constructs a new {@link TornadoVMBytecodeAssembler} instance.
          *
          * @param code
-         *            The byte array to hold the assembled bytecode.
+         *     The byte array to hold the assembled bytecode.
          */
         TornadoVMBytecodeAssembler(byte[] code) {
             buffer = ByteBuffer.wrap(code);
@@ -217,6 +220,7 @@ public class TornadoVMBytecodeBuilder {
         }
 
         void transferToHost(int obj, int dep, long offset, long size) {
+            lastCopyOutPosition = buffer.position();
             buffer.put(TornadoVMBytecodes.TRANSFER_DEVICE_TO_HOST_ALWAYS.value);
             buffer.putInt(obj);
             buffer.putInt(dep);
@@ -249,13 +253,17 @@ public class TornadoVMBytecodeBuilder {
             buffer.putInt(index);
         }
 
+        int getLastCopyOutPosition() {
+            return lastCopyOutPosition;
+        }
+
         /**
          * Dumps the assembled bytecode by printing it to the console.
          */
         public void dump() {
             final int width = 16;
-            System.out.printf("code  : capacity = %s, in use = %s   \n", RuntimeUtilities.humanReadableByteCount(buffer.capacity(), true),
-                    RuntimeUtilities.humanReadableByteCount(buffer.position(), true));
+            System.out.printf("code  : capacity = %s, in use = %s   \n", RuntimeUtilities.humanReadableByteCount(buffer.capacity(), true), RuntimeUtilities.humanReadableByteCount(buffer.position(),
+                    true));
             for (int i = 0; i < buffer.position(); i += width) {
                 System.out.printf("[0x%04x]: ", i);
                 for (int j = 0; j < Math.min(buffer.capacity() - i, width); j++) {

@@ -12,7 +12,7 @@
  *
  * This code is distributed in the hope that it will be useful, but WITHOUT
  * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
- * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License
  * version 2 for more details (a copy is included in the LICENSE file that
  * accompanied this code).
  *
@@ -25,7 +25,7 @@ package uk.ac.manchester.tornado.runtime.interpreter;
 
 import uk.ac.manchester.tornado.api.enums.TornadoVMBackendType;
 import uk.ac.manchester.tornado.runtime.common.ColoursTerminal;
-import uk.ac.manchester.tornado.runtime.common.TornadoAcceleratorDevice;
+import uk.ac.manchester.tornado.runtime.common.TornadoXPUDevice;
 
 public class InterpreterUtilities {
 
@@ -36,11 +36,15 @@ public class InterpreterUtilities {
         return ColoursTerminal.RED + " " + bc + " " + ColoursTerminal.RESET;
     }
 
+    static String debugHighLightNonExecBC(String bc) {
+        return ColoursTerminal.YELLOW + " " + bc + " " + ColoursTerminal.RESET;
+    }
+
     static String debugHighLightHelper(String info) {
         return ColoursTerminal.BLUE + info + " " + ColoursTerminal.RESET;
     }
 
-    static String debugDeviceBC(TornadoAcceleratorDevice device) {
+    static String debugDeviceBC(TornadoXPUDevice device) {
         TornadoVMBackendType tornadoVMBackend = device.getTornadoVMBackend();
         if (tornadoVMBackend == TornadoVMBackendType.OPENCL) {
             return ColoursTerminal.CYAN + " " + device + " " + ColoursTerminal.RESET;

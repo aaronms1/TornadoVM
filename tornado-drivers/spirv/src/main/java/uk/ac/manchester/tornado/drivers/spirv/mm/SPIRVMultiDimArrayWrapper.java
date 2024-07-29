@@ -12,7 +12,7 @@
  *
  * This code is distributed in the hope that it will be useful, but WITHOUT
  * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
- * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License
  * version 2 for more details (a copy is included in the LICENSE file that
  * accompanied this code).
  *
@@ -23,8 +23,6 @@
  */
 package uk.ac.manchester.tornado.drivers.spirv.mm;
 
-import static uk.ac.manchester.tornado.runtime.common.Tornado.fatal;
-
 import java.lang.reflect.Array;
 import java.util.function.Function;
 
@@ -32,6 +30,7 @@ import jdk.vm.ci.meta.JavaKind;
 import uk.ac.manchester.tornado.api.exceptions.TornadoMemoryException;
 import uk.ac.manchester.tornado.api.exceptions.TornadoOutOfMemoryException;
 import uk.ac.manchester.tornado.drivers.spirv.SPIRVDeviceContext;
+import uk.ac.manchester.tornado.runtime.common.TornadoLogger;
 
 public class SPIRVMultiDimArrayWrapper<T, E> extends SPIRVArrayWrapper<T> {
 
@@ -71,7 +70,7 @@ public class SPIRVMultiDimArrayWrapper<T, E> extends SPIRVArrayWrapper<T> {
                 addresses[i] = wrappers[i].toBuffer();
             }
         } catch (TornadoOutOfMemoryException | TornadoMemoryException e) {
-            fatal("OOM: multi-dim array: %s", e.getMessage());
+            new TornadoLogger().fatal("OOM: multi-dim array: %s", e.getMessage());
             throw new RuntimeException(e);
         }
     }
@@ -91,50 +90,50 @@ public class SPIRVMultiDimArrayWrapper<T, E> extends SPIRVArrayWrapper<T> {
         allocateElements((T) value, batchSize);
     }
 
-    private int readElements(T values) {
+    private int readElements(long executionPlanId, T values) {
         final E[] elements = innerCast(values);
         // XXX: Offset is 0
         for (int i = 0; i < elements.length; i++) {
-            wrappers[i].read(elements[i], 0, null, false);
+            wrappers[i].read(executionPlanId, elements[i], 0, 0, null, false);
         }
-        deviceContext.enqueueBarrier(deviceContext.getDeviceIndex());
+        deviceContext.enqueueBarrier(executionPlanId, deviceContext.getDeviceIndex());
         return 0;
     }
 
     @Override
-    protected int readArrayData(long bufferId, long offset, long bytes, T value, long hostOffset, int[] waitEvents) {
-        return readElements(value);
+    protected int readArrayData(long executionPlanId, long bufferId, long offset, long bytes, T value, long hostOffset, int[] waitEvents) {
+        return readElements(executionPlanId, value);
     }
 
-    private int writeElements(T values) {
+    private int writeElements(long executionPlanId, T values) {
         final E[] elements = innerCast(values);
         for (int i = 0; i < elements.length; i++) {
-            wrappers[i].enqueueWrite(elements[i], 0, 0, null, false);
+            wrappers[i].enqueueWrite(executionPlanId, elements[i], 0, 0, null, false);
         }
-        deviceContext.enqueueBarrier(deviceContext.getDeviceIndex());
+        deviceContext.enqueueBarrier(executionPlanId, deviceContext.getDeviceIndex());
         return 0;
     }
 
     @Override
-    protected void writeArrayData(long bufferId, long offset, long bytes, T value, long hostOffset, int[] waitEvents) {
+    protected void writeArrayData(long executionPlanId, long bufferId, long offset, long bytes, T value, long hostOffset, int[] waitEvents) {
         if (hostOffset > 0) {
             System.out.println("[WARNING] writing in offset 0");
         }
-        tableWrapper.enqueueWrite(addresses, 0, 0, null, false);
-        writeElements(value);
+        tableWrapper.enqueueWrite(executionPlanId, addresses, 0, 0, null, false);
+        writeElements(executionPlanId, value);
     }
 
     @Override
-    protected int enqueueReadArrayData(long bufferId, long offset, long bytes, T value, long hostOffset, int[] waitEvents) {
-        return readElements(value);
+    protected int enqueueReadArrayData(long executionPlanId, long bufferId, long offset, long bytes, T value, long hostOffset, int[] waitEvents) {
+        return readElements(executionPlanId, value);
     }
 
     @Override
-    protected int enqueueWriteArrayData(long bufferId, long offset, long bytes, T value, long hostOffset, int[] waitEvents) {
+    protected int enqueueWriteArrayData(long executionPlanId, long bufferId, long offset, long bytes, T value, long hostOffset, int[] waitEvents) {
         if (hostOffset > 0) {
             System.out.println("[WARNING] writing in offset 0");
         }
-        tableWrapper.enqueueWrite(addresses, 0, 0, null, false);
-        return writeElements(value);
+        tableWrapper.enqueueWrite(executionPlanId, addresses, 0, 0, null, false);
+        return writeElements(executionPlanId, value);
     }
 }

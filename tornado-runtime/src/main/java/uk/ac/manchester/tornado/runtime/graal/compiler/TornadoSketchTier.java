@@ -12,15 +12,13 @@
  *
  * This code is distributed in the hope that it will be useful, but WITHOUT
  * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
- * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License
  * version 2 for more details (a copy is included in the LICENSE file that
  * accompanied this code).
  *
  * You should have received a copy of the GNU General Public License version
  * 2 along with this work; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
- *
- * Authors: James Clarkson
  *
  */
 package uk.ac.manchester.tornado.runtime.graal.compiler;
@@ -38,24 +36,24 @@ import org.graalvm.compiler.phases.common.inlining.InliningPhase;
 import org.graalvm.compiler.phases.common.inlining.policy.InliningPolicy;
 
 import uk.ac.manchester.tornado.runtime.common.TornadoOptions;
-import uk.ac.manchester.tornado.runtime.graal.phases.TornadoApiReplacement;
-import uk.ac.manchester.tornado.runtime.graal.phases.TornadoAutoParalleliser;
-import uk.ac.manchester.tornado.runtime.graal.phases.TornadoDataflowAnalysis;
-import uk.ac.manchester.tornado.runtime.graal.phases.TornadoFullInliningPolicy;
-import uk.ac.manchester.tornado.runtime.graal.phases.TornadoKernelContextReplacement;
-import uk.ac.manchester.tornado.runtime.graal.phases.TornadoNumericPromotionPhase;
-import uk.ac.manchester.tornado.runtime.graal.phases.TornadoPartialInliningPolicy;
-import uk.ac.manchester.tornado.runtime.graal.phases.TornadoReduceReplacement;
+import uk.ac.manchester.tornado.runtime.graal.phases.TornadoHalfFloatFixedGuardElimination;
 import uk.ac.manchester.tornado.runtime.graal.phases.TornadoSketchTierContext;
-import uk.ac.manchester.tornado.runtime.graal.phases.TornadoStampResolver;
+import uk.ac.manchester.tornado.runtime.graal.phases.sketcher.TornadoApiReplacement;
+import uk.ac.manchester.tornado.runtime.graal.phases.sketcher.TornadoAutoParalleliser;
+import uk.ac.manchester.tornado.runtime.graal.phases.sketcher.TornadoBatchFunctionAnalysis;
+import uk.ac.manchester.tornado.runtime.graal.phases.sketcher.TornadoDataflowAnalysis;
+import uk.ac.manchester.tornado.runtime.graal.phases.sketcher.TornadoFullInliningPolicy;
+import uk.ac.manchester.tornado.runtime.graal.phases.sketcher.TornadoKernelContextReplacement;
+import uk.ac.manchester.tornado.runtime.graal.phases.sketcher.TornadoNativeTypeElimination;
+import uk.ac.manchester.tornado.runtime.graal.phases.sketcher.TornadoNumericPromotionPhase;
+import uk.ac.manchester.tornado.runtime.graal.phases.sketcher.TornadoPanamaPrivateMemory;
+import uk.ac.manchester.tornado.runtime.graal.phases.sketcher.TornadoPartialInliningPolicy;
+import uk.ac.manchester.tornado.runtime.graal.phases.sketcher.TornadoReduceReplacement;
+import uk.ac.manchester.tornado.runtime.graal.phases.sketcher.TornadoStampResolver;
 
 public class TornadoSketchTier extends PhaseSuite<TornadoSketchTierContext> {
 
     protected final CanonicalizerPhase.CustomSimplification customSimplification;
-
-    private CanonicalizerPhase createCanonicalizerPhase(OptionValues options, CanonicalizerPhase.CustomSimplification customCanonicalizer) {
-        return CanonicalizerPhase.create();
-    }
 
     public TornadoSketchTier(OptionValues options, CanonicalizerPhase.CustomSimplification customCanonicalizer) {
         this.customSimplification = customCanonicalizer;
@@ -78,10 +76,18 @@ public class TornadoSketchTier extends PhaseSuite<TornadoSketchTierContext> {
         }
 
         appendPhase(new TornadoStampResolver());
+        appendPhase(new TornadoHalfFloatFixedGuardElimination());
+        appendPhase(new TornadoNativeTypeElimination());
         appendPhase(new TornadoReduceReplacement());
         appendPhase(new TornadoApiReplacement());
         appendPhase(new TornadoKernelContextReplacement());
         appendPhase(new TornadoAutoParalleliser());
         appendPhase(new TornadoDataflowAnalysis());
+        appendPhase(new TornadoPanamaPrivateMemory());
+        appendPhase(new TornadoBatchFunctionAnalysis());
+    }
+
+    private CanonicalizerPhase createCanonicalizerPhase(OptionValues options, CanonicalizerPhase.CustomSimplification customCanonicalizer) {
+        return CanonicalizerPhase.create();
     }
 }

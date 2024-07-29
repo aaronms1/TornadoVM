@@ -10,7 +10,7 @@
  *
  * This code is distributed in the hope that it will be useful, but WITHOUT
  * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
- * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License
  * version 2 for more details (a copy is included in the LICENSE file that
  * accompanied this code).
  *
@@ -35,6 +35,7 @@ import org.graalvm.compiler.phases.common.AddressLoweringByNodePhase;
 import uk.ac.manchester.tornado.api.exceptions.TornadoInternalError;
 import uk.ac.manchester.tornado.drivers.ptx.graal.PTXArchitecture;
 import uk.ac.manchester.tornado.drivers.ptx.graal.nodes.FixedArrayNode;
+import uk.ac.manchester.tornado.drivers.ptx.graal.nodes.FixedArrayCopyNode;
 import uk.ac.manchester.tornado.drivers.ptx.graal.nodes.LocalArrayNode;
 
 public class PTXAddressLowering extends AddressLoweringByNodePhase.AddressLowering {
@@ -42,10 +43,12 @@ public class PTXAddressLowering extends AddressLoweringByNodePhase.AddressLoweri
     @Override
     public AddressNode lower(ValueNode base, ValueNode offset) {
         PTXMemoryBase memoryRegister = PTXArchitecture.globalSpace;
-        if (base instanceof FixedArrayNode) {
-            memoryRegister = ((FixedArrayNode) base).getMemoryRegister();
-        } else if (base instanceof LocalArrayNode) {
-            memoryRegister = ((LocalArrayNode) base).getMemoryRegister();
+        if (base instanceof FixedArrayNode fixedArrayNode) {
+            memoryRegister = fixedArrayNode.getMemoryRegister();
+        } else if (base instanceof FixedArrayCopyNode fixedArrayCopyNode) {
+            memoryRegister = fixedArrayCopyNode.getMemoryRegister();
+        } else if (base instanceof LocalArrayNode localArrayNode) {
+            memoryRegister = localArrayNode.getMemoryRegister();
         } else if (!((base instanceof ParameterNode) || (base instanceof ReadNode) || (base instanceof FloatingReadNode) || (base instanceof PiNode))) {
             TornadoInternalError.unimplemented("address origin unimplemented: %s", base.getClass().getName());
         }

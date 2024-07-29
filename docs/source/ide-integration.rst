@@ -40,8 +40,11 @@ Install the following plugins:
 3. `Python Plugin (Optional): <https://plugins.jetbrains.com/plugin/631-python>`__
    Allows Python scripting.
 
+4. `CheckStyle-IDEA Plugin (Optional): <https://plugins.jetbrains.com/plugin/1065-checkstyle-idea>`__
+    Checks project for compliance with custom checkstyle rules.
+
 Run and Debug TornadoVM with Intellij
-~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Normal maven lifecycle goals like *package* and *install* will not
 result a succefull build for TornadoVM.
@@ -110,10 +113,10 @@ the following commands to print the flags:**
 
 Output should be something similar to this:
 
-.. code:: bash 
+.. code:: bash
 
    /PATH_TO_JDK/jdk1.8.0_131/bin/java
-   -server -XX:-UseJVMCIClassLoader -XX:-UseCompressedOops -Djava.ext.dirs=/home/michalis/Tornado/tornado/bin/sdk/share/java/tornado -Djava.library.path=/home/michalis/Tornado/tornado/bin/sdk/lib -Dtornado.load.api.implementation=uk.ac.manchester.tornado.runtime.tasks.TornadoTaskGraph -Dtornado.load.runtime.implementation=uk.ac.manchester.tornado.runtime.TornadoCoreRuntime -Dtornado.load.tornado.implementation=uk.ac.manchester.tornado.runtime.common.Tornado -Dtornado.load.device.implementation.opencl=uk.ac.manchester.tornado.drivers.opencl.runtime.OCLDeviceFactory -Dtornado.load.device.implementation.ptx=uk.ac.manchester.tornado.drivers.ptx.runtime.PTXDeviceFactory
+   -server -XX:-UseJVMCIClassLoader -XX:-UseCompressedOops -Djava.ext.dirs=/home/michalis/Tornado/tornado/bin/sdk/share/java/tornado -Djava.library.path=/home/michalis/Tornado/tornado/bin/sdk/lib -Dtornado.load.api.implementation=uk.ac.manchester.tornado.runtime.tasks.TornadoTaskGraph -Dtornado.load.runtime.implementation=uk.ac.manchester.tornado.runtime.TornadoCoreRuntime -Dtornado.load.tornado.implementation=uk.ac.manchester.tornado.runtime.common.Tornado
 
 You need to copy from ``-server`` to end.
 
@@ -135,3 +138,10 @@ Then, add your own parameters similar to the following:
 Finally, you can select the new custom configuration by selecting the
 configuration from the right top drop-down menu. Now, you can run it by
 pressing the **play button** on the top right corner or **Shift+F10**.
+
+CheckStyle-IDEA Configuration
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+First, add the custom checkstyle file to enable its rules go to  **IntelliJ > Settings > Tools > CheckStyle** then,
+under configuration file click plus then add the configuration file which is under `tornado-assembly/src/etc/checkstyle.xml`.
+
+Then, on the side on enabled plugins click on checkstyle and then in `rules` topdown menu click the custom rules file.

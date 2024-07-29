@@ -2,7 +2,7 @@
  * This file is part of Tornado: A heterogeneous programming framework:
  * https://github.com/beehive-lab/tornadovm
  *
- * Copyright (c) 2020, APT Group, Department of Computer Science,
+ * Copyright (c) 2020,2024 APT Group, Department of Computer Science,
  * School of Engineering, The University of Manchester. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
@@ -12,7 +12,7 @@
  *
  * This code is distributed in the hope that it will be useful, but WITHOUT
  * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
- * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License
  * version 2 for more details (a copy is included in the LICENSE file that
  * accompanied this code).
  *
@@ -27,10 +27,7 @@ import static uk.ac.manchester.tornado.api.exceptions.TornadoInternalError.shoul
 import static uk.ac.manchester.tornado.api.exceptions.TornadoInternalError.unimplemented;
 import static uk.ac.manchester.tornado.runtime.TornadoCoreRuntime.getVMConfig;
 import static uk.ac.manchester.tornado.runtime.TornadoCoreRuntime.getVMRuntime;
-import static uk.ac.manchester.tornado.runtime.common.Tornado.DEBUG;
-import static uk.ac.manchester.tornado.runtime.common.Tornado.debug;
-import static uk.ac.manchester.tornado.runtime.common.Tornado.trace;
-import static uk.ac.manchester.tornado.runtime.common.Tornado.warn;
+import static uk.ac.manchester.tornado.runtime.common.TornadoOptions.DEBUG;
 
 import java.lang.reflect.Field;
 import java.nio.ByteBuffer;
@@ -42,34 +39,39 @@ import jdk.vm.ci.hotspot.HotSpotResolvedJavaField;
 import jdk.vm.ci.hotspot.HotSpotResolvedJavaType;
 import uk.ac.manchester.tornado.api.exceptions.TornadoInternalError;
 import uk.ac.manchester.tornado.api.exceptions.TornadoMemoryException;
-import uk.ac.manchester.tornado.api.memory.ObjectBuffer;
-import uk.ac.manchester.tornado.api.type.annotations.Vector;
+import uk.ac.manchester.tornado.api.internal.annotations.Vector;
+import uk.ac.manchester.tornado.api.memory.XPUBuffer;
+import uk.ac.manchester.tornado.api.types.arrays.ByteArray;
+import uk.ac.manchester.tornado.api.types.arrays.DoubleArray;
+import uk.ac.manchester.tornado.api.types.arrays.FloatArray;
+import uk.ac.manchester.tornado.api.types.arrays.HalfFloatArray;
+import uk.ac.manchester.tornado.api.types.arrays.IntArray;
+import uk.ac.manchester.tornado.api.types.arrays.LongArray;
+import uk.ac.manchester.tornado.api.types.arrays.ShortArray;
 import uk.ac.manchester.tornado.drivers.ptx.PTXDeviceContext;
 import uk.ac.manchester.tornado.runtime.common.RuntimeUtilities;
+import uk.ac.manchester.tornado.runtime.common.TornadoLogger;
 import uk.ac.manchester.tornado.runtime.utils.TornadoUtils;
 
-public class PTXObjectWrapper implements ObjectBuffer {
+public class PTXObjectWrapper implements XPUBuffer {
 
+    private static final int BYTES_OBJECT_REFERENCE = 8;
+    private final Class<?> type;
+    private final PTXDeviceContext deviceContext;
     private long address;
     private ByteBuffer buffer;
     private HotSpotResolvedJavaType resolvedType;
     private HotSpotResolvedJavaField[] fields;
     private FieldBuffer[] wrappedFields;
-
-    private final Class<?> type;
-
     private int hubOffset;
     private int fieldsOffset;
-
-    private final PTXDeviceContext deviceContext;
-
-    private static final int BYTES_OBJECT_REFERENCE = 8;
     private long subRegionSize;
+    private final TornadoLogger logger;
 
     public PTXObjectWrapper(final PTXDeviceContext device, Object object) {
         this.type = object.getClass();
         this.deviceContext = device;
-
+        this.logger = new TornadoLogger(this.getClass());
         hubOffset = getVMConfig().hubOffset;
         fieldsOffset = getVMConfig().instanceKlassFieldsOffset();
 
@@ -86,10 +88,10 @@ public class PTXObjectWrapper implements ObjectBuffer {
             final Class<?> type = reflectedField.getType();
 
             if (DEBUG) {
-                trace("field: name=%s, kind=%s, offset=%d", field.getName(), type.getName(), field.getOffset());
+                logger.trace("field: name=%s, kind=%s, offset=%d", field.getName(), type.getName(), field.getOffset());
             }
 
-            ObjectBuffer wrappedField = null;
+            XPUBuffer wrappedField = null;
             if (type.isArray()) {
                 if (type == int[].class) {
                     wrappedField = new PTXIntArrayWrapper(deviceContext);
@@ -104,8 +106,29 @@ public class PTXObjectWrapper implements ObjectBuffer {
                 } else if (type == byte[].class) {
                     wrappedField = new PTXByteArrayWrapper(deviceContext);
                 } else {
-                    warn("cannot wrap field: array type=%s", type.getName());
+                    logger.warn("cannot wrap field: array type=%s", type.getName());
                 }
+            } else if (type == FloatArray.class) {
+                Object objectFromField = TornadoUtils.getObjectFromField(reflectedField, object);
+                wrappedField = new PTXMemorySegmentWrapper(device, ((FloatArray) objectFromField).getSegmentWithHeader().byteSize(), 0);
+            } else if (type == ByteArray.class) {
+                Object objectFromField = TornadoUtils.getObjectFromField(reflectedField, object);
+                wrappedField = new PTXMemorySegmentWrapper(device, ((ByteArray) objectFromField).getSegmentWithHeader().byteSize(), 0);
+            } else if (type == DoubleArray.class) {
+                Object objectFromField = TornadoUtils.getObjectFromField(reflectedField, object);
+                wrappedField = new PTXMemorySegmentWrapper(device, ((DoubleArray) objectFromField).getSegmentWithHeader().byteSize(), 0);
+            } else if (type == IntArray.class) {
+                Object objectFromField = TornadoUtils.getObjectFromField(reflectedField, object);
+                wrappedField = new PTXMemorySegmentWrapper(device, ((IntArray) objectFromField).getSegmentWithHeader().byteSize(), 0);
+            } else if (type == ShortArray.class) {
+                Object objectFromField = TornadoUtils.getObjectFromField(reflectedField, object);
+                wrappedField = new PTXMemorySegmentWrapper(device, ((ShortArray) objectFromField).getSegmentWithHeader().byteSize(), 0);
+            } else if (type == LongArray.class) {
+                Object objectFromField = TornadoUtils.getObjectFromField(reflectedField, object);
+                wrappedField = new PTXMemorySegmentWrapper(device, ((LongArray) objectFromField).getSegmentWithHeader().byteSize(), 0);
+            } else if (type == HalfFloatArray.class) {
+                Object objectFromField = TornadoUtils.getObjectFromField(reflectedField, object);
+                wrappedField = new PTXMemorySegmentWrapper(device, ((HalfFloatArray) objectFromField).getSegmentWithHeader().byteSize(), 0);
             } else if (object.getClass().getAnnotation(Vector.class) != null) {
                 wrappedField = new PTXVectorWrapper(device, TornadoUtils.getObjectFromField(reflectedField, object), 0);
             } else if (field.getJavaKind().isObject()) {
@@ -128,13 +151,13 @@ public class PTXObjectWrapper implements ObjectBuffer {
     @Override
     public void allocate(Object reference, long batchSize) {
         if (DEBUG) {
-            debug("object: object=0x%x, class=%s", reference.hashCode(), reference.getClass().getName());
+            logger.debug("object: object=0x%x, class=%s", reference.hashCode(), reference.getClass().getName());
         }
 
-        this.address = deviceContext.getBufferProvider().getBufferWithSize(getObjectSize());
+        this.address = deviceContext.getBufferProvider().getOrAllocateBufferWithSize(getObjectSize());
 
         if (DEBUG) {
-            debug("object: object=0x%x @ address 0x%x", reference.hashCode(), address);
+            logger.debug("object: object=0x%x @ address 0x%x", reference.hashCode(), address);
         }
         for (FieldBuffer buffer : wrappedFields) {
             if (buffer != null) {
@@ -148,8 +171,8 @@ public class PTXObjectWrapper implements ObjectBuffer {
     }
 
     @Override
-    public void deallocate() throws TornadoMemoryException {
-        deviceContext.getBufferProvider().markBufferReleased(address, getObjectSize());
+    public void markAsFreeBuffer() throws TornadoMemoryException {
+        deviceContext.getBufferProvider().markBufferReleased(address);
         address = -1;
         for (FieldBuffer buffer : wrappedFields) {
             if (buffer != null) {
@@ -238,7 +261,7 @@ public class PTXObjectWrapper implements ObjectBuffer {
                 HotSpotResolvedJavaField field = fields[i];
                 Field f = getField(type, field.getName());
                 if (DEBUG) {
-                    trace("writing field: name=%s, offset=%d", field.getName(), field.getOffset());
+                    logger.trace("writing field: name=%s, offset=%d", field.getName(), field.getOffset());
                 }
 
                 buffer.position(field.getOffset());
@@ -258,7 +281,7 @@ public class PTXObjectWrapper implements ObjectBuffer {
                 Field f = getField(type, field.getName());
                 f.setAccessible(true);
                 if (DEBUG) {
-                    trace("reading field: name=%s, offset=%d", field.getName(), field.getOffset());
+                    logger.trace("reading field: name=%s, offset=%d", field.getName(), field.getOffset());
                 }
                 readFieldFromBuffer(i, f, object);
             }
@@ -271,7 +294,7 @@ public class PTXObjectWrapper implements ObjectBuffer {
     }
 
     @Override
-    public void setBuffer(ObjectBufferWrapper bufferWrapper) {
+    public void setBuffer(XPUBufferWrapper bufferWrapper) {
         TornadoInternalError.shouldNotReachHere();
     }
 
@@ -281,31 +304,31 @@ public class PTXObjectWrapper implements ObjectBuffer {
     }
 
     @Override
-    public void write(Object object) {
+    public void write(long executionPlanId, Object object) {
         serialise(object);
         // XXX: Offset 0
-        deviceContext.writeBuffer(toBuffer(), getObjectSize(), buffer.array(), 0, null);
+        deviceContext.writeBuffer(executionPlanId, toBuffer(), getObjectSize(), buffer.array(), 0, null);
         for (int i = 0; i < fields.length; i++) {
             if (wrappedFields[i] != null) {
-                wrappedFields[i].write(object);
+                wrappedFields[i].write(executionPlanId, object);
             }
         }
     }
 
     @Override
-    public void read(Object object) {
-        // XXX: offset 0
-        read(object, 0, null, false);
+    public void read(long executionPlanId, Object object) {
+        // XXX: offset and partial size set to 0
+        read(executionPlanId, object, 0, 0, null, false);
     }
 
     @Override
-    public int read(Object object, long hostOffset, int[] events, boolean useDeps) {
+    public int read(long executionPlanId, Object object, long hostOffset, long partialReadSize, int[] events, boolean useDeps) {
         int event = -1;
         buffer.position(buffer.capacity());
-        event = deviceContext.readBuffer(toBuffer(), getObjectSize(), buffer.array(), hostOffset, (useDeps) ? events : null);
+        event = deviceContext.readBuffer(executionPlanId, toBuffer(), getObjectSize(), buffer.array(), hostOffset, (useDeps) ? events : null);
         for (int i = 0; i < fields.length; i++) {
             if (wrappedFields[i] != null) {
-                wrappedFields[i].read(object);
+                wrappedFields[i].read(executionPlanId, object);
             }
         }
         deserialise(object);
@@ -325,8 +348,8 @@ public class PTXObjectWrapper implements ObjectBuffer {
     }
 
     protected void dump(int width) {
-        System.out.printf("Buffer  : capacity = %s, in use = %s, device = %s \n", RuntimeUtilities.humanReadableByteCount(getObjectSize(), true),
-                RuntimeUtilities.humanReadableByteCount(buffer.position(), true), deviceContext.getDevice().getDeviceName());
+        System.out.printf("Buffer  : capacity = %s, in use = %s, device = %s \n", RuntimeUtilities.humanReadableByteCount(getObjectSize(), true), RuntimeUtilities.humanReadableByteCount(buffer
+                .position(), true), deviceContext.getDevice().getDeviceName());
         for (int i = 0; i < buffer.position(); i += width) {
             System.out.printf("[0x%04x]: ", i);
             for (int j = 0; j < Math.min(buffer.capacity() - i, width); j++) {
@@ -344,7 +367,7 @@ public class PTXObjectWrapper implements ObjectBuffer {
     }
 
     @Override
-    public int enqueueRead(Object reference, long hostOffset, int[] events, boolean useDeps) {
+    public int enqueueRead(long executionPlanId, Object reference, long hostOffset, int[] events, boolean useDeps) {
         final int returnEvent;
         int index = 0;
         int[] internalEvents = new int[fields.length];
@@ -352,32 +375,32 @@ public class PTXObjectWrapper implements ObjectBuffer {
 
         for (FieldBuffer fb : wrappedFields) {
             if (fb != null) {
-                internalEvents[index] = fb.enqueueRead(reference, (useDeps) ? events : null, useDeps);
+                internalEvents[index] = fb.enqueueRead(executionPlanId, reference, (useDeps) ? events : null, useDeps);
                 index++;
             }
         }
 
-        internalEvents[index] = deviceContext.enqueueReadBuffer(toBuffer(), getObjectSize(), buffer.array(), hostOffset, (useDeps) ? events : null);
+        internalEvents[index] = deviceContext.enqueueReadBuffer(executionPlanId, toBuffer(), getObjectSize(), buffer.array(), hostOffset, (useDeps) ? events : null);
         index++;
 
         deserialise(reference);
         if (index == 1) {
             returnEvent = internalEvents[0];
         } else {
-            returnEvent = deviceContext.enqueueMarker(internalEvents);
+            returnEvent = deviceContext.enqueueMarker(executionPlanId, internalEvents);
         }
         return returnEvent;
     }
 
     @Override
-    public List<Integer> enqueueWrite(Object ref, long batchSize, long hostOffset, int[] events, boolean useDeps) {
+    public List<Integer> enqueueWrite(long executionPlanId, Object ref, long batchSize, long hostOffset, int[] events, boolean useDeps) {
         ArrayList<Integer> eventList = new ArrayList<>();
 
         serialise(ref);
-        eventList.add(deviceContext.enqueueWriteBuffer(toBuffer(), getObjectSize(), buffer.array(), hostOffset, (useDeps) ? events : null));
+        eventList.add(deviceContext.enqueueWriteBuffer(executionPlanId, toBuffer(), getObjectSize(), buffer.array(), hostOffset, (useDeps) ? events : null));
         for (final FieldBuffer field : wrappedFields) {
             if (field != null) {
-                eventList.addAll(field.enqueueWrite(ref, (useDeps) ? events : null, useDeps));
+                eventList.addAll(field.enqueueWrite(executionPlanId, ref, (useDeps) ? events : null, useDeps));
             }
         }
         return eventList;
@@ -408,8 +431,23 @@ public class PTXObjectWrapper implements ObjectBuffer {
     }
 
     @Override
-    public long getSizeSubRegion() {
+    public long getSizeSubRegionSize() {
         return this.subRegionSize;
+    }
+
+    @Override
+    public int[] getIntBuffer() {
+        return XPUBuffer.super.getIntBuffer();
+    }
+
+    @Override
+    public void setIntBuffer(int[] arr) {
+        XPUBuffer.super.setIntBuffer(arr);
+    }
+
+    @Override
+    public long deallocate() {
+        return deviceContext.getBufferProvider().deallocate();
     }
 
 }

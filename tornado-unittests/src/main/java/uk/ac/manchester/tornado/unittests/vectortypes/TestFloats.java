@@ -6,7 +6,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *    http://www.apache.org/licenses/LICENSE-2.0
+ * http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -21,6 +21,7 @@ package uk.ac.manchester.tornado.unittests.vectortypes;
 import static org.junit.Assert.assertEquals;
 
 import java.util.Random;
+import java.util.stream.IntStream;
 
 import org.junit.Test;
 
@@ -28,26 +29,37 @@ import uk.ac.manchester.tornado.api.ImmutableTaskGraph;
 import uk.ac.manchester.tornado.api.TaskGraph;
 import uk.ac.manchester.tornado.api.TornadoExecutionPlan;
 import uk.ac.manchester.tornado.api.annotations.Parallel;
-import uk.ac.manchester.tornado.api.collections.types.Float2;
-import uk.ac.manchester.tornado.api.collections.types.Float3;
-import uk.ac.manchester.tornado.api.collections.types.Float4;
-import uk.ac.manchester.tornado.api.collections.types.Float6;
-import uk.ac.manchester.tornado.api.collections.types.Float8;
-import uk.ac.manchester.tornado.api.collections.types.VectorFloat;
-import uk.ac.manchester.tornado.api.collections.types.VectorFloat2;
-import uk.ac.manchester.tornado.api.collections.types.VectorFloat3;
-import uk.ac.manchester.tornado.api.collections.types.VectorFloat4;
-import uk.ac.manchester.tornado.api.collections.types.VectorFloat8;
 import uk.ac.manchester.tornado.api.enums.DataTransferMode;
+import uk.ac.manchester.tornado.api.exceptions.TornadoExecutionPlanException;
+import uk.ac.manchester.tornado.api.types.arrays.FloatArray;
+import uk.ac.manchester.tornado.api.types.collections.VectorFloat;
+import uk.ac.manchester.tornado.api.types.collections.VectorFloat16;
+import uk.ac.manchester.tornado.api.types.collections.VectorFloat2;
+import uk.ac.manchester.tornado.api.types.collections.VectorFloat3;
+import uk.ac.manchester.tornado.api.types.collections.VectorFloat4;
+import uk.ac.manchester.tornado.api.types.collections.VectorFloat8;
+import uk.ac.manchester.tornado.api.types.collections.VectorInt16;
+import uk.ac.manchester.tornado.api.types.collections.VectorInt2;
+import uk.ac.manchester.tornado.api.types.collections.VectorInt4;
+import uk.ac.manchester.tornado.api.types.collections.VectorInt8;
+import uk.ac.manchester.tornado.api.types.vectors.Float16;
+import uk.ac.manchester.tornado.api.types.vectors.Float2;
+import uk.ac.manchester.tornado.api.types.vectors.Float3;
+import uk.ac.manchester.tornado.api.types.vectors.Float4;
+import uk.ac.manchester.tornado.api.types.vectors.Float8;
+import uk.ac.manchester.tornado.api.types.vectors.Int16;
+import uk.ac.manchester.tornado.api.types.vectors.Int2;
+import uk.ac.manchester.tornado.api.types.vectors.Int4;
+import uk.ac.manchester.tornado.api.types.vectors.Int8;
 import uk.ac.manchester.tornado.unittests.common.TornadoNotSupported;
 import uk.ac.manchester.tornado.unittests.common.TornadoTestBase;
 
 /**
  * <p>
- * How to run?
+ * How to run.
  * </p>
  * <code>
- *     tornado-test -V uk.ac.manchester.tornado.unittests.vectortypes.TestFloats
+ * tornado-test -V uk.ac.manchester.tornado.unittests.vectortypes.TestFloats
  * </code>
  */
 public class TestFloats extends TornadoTestBase {
@@ -69,13 +81,13 @@ public class TestFloats extends TornadoTestBase {
         result.set(0, dot);
     }
 
-    private static void dotMethodFloat6(Float6 a, Float6 b, VectorFloat result) {
-        float dot = Float6.dot(a, b);
+    private static void dotMethodFloat8(Float8 a, Float8 b, VectorFloat result) {
+        float dot = Float8.dot(a, b);
         result.set(0, dot);
     }
 
-    private static void dotMethodFloat8(Float8 a, Float8 b, VectorFloat result) {
-        float dot = Float8.dot(a, b);
+    private static void dotMethodFloat16(Float16 a, Float16 b, VectorFloat result) {
+        float dot = Float16.dot(a, b);
         result.set(0, dot);
     }
 
@@ -84,7 +96,7 @@ public class TestFloats extends TornadoTestBase {
     }
 
     /**
-     * Test using the {@link Float} Java Wrapper class
+     * Test using the {@link Float} Java Wrapper class.
      *
      * @param a
      * @param b
@@ -97,7 +109,7 @@ public class TestFloats extends TornadoTestBase {
     }
 
     /**
-     * Test using the {@link Float2} Tornado wrapper class
+     * Test using the {@link Float2} Tornado wrapper class.
      *
      * @param a
      * @param b
@@ -110,7 +122,7 @@ public class TestFloats extends TornadoTestBase {
     }
 
     /**
-     * Test using Tornado {@link VectorFloat3} data type
+     * Test using Tornado {@link VectorFloat3} data type.
      *
      * @param a
      * @param b
@@ -123,7 +135,7 @@ public class TestFloats extends TornadoTestBase {
     }
 
     /**
-     * Test using Tornado {@link VectorFloat3} data type
+     * Test using Tornado {@link VectorFloat3} data type.
      *
      * @param a
      * @param b
@@ -136,7 +148,7 @@ public class TestFloats extends TornadoTestBase {
     }
 
     /**
-     * Test using Tornado {@link VectorFloat4} data type
+     * Test using Tornado {@link VectorFloat4} data type.
      *
      * @param a
      * @param b
@@ -154,25 +166,30 @@ public class TestFloats extends TornadoTestBase {
         }
     }
 
-    public static void addVectorFloat8Storage(VectorFloat8 a, VectorFloat8 results) {
+    public static void addVectorFloat16(VectorFloat16 a, VectorFloat16 b, VectorFloat16 results) {
         for (@Parallel int i = 0; i < a.getLength(); i++) {
-            Float8 float8 = a.get(i);
-            results.set(i, new Float8(float8.getArray()));
+            results.set(i, Float16.add(a.get(i), b.get(i)));
         }
     }
 
-    public static void dotProductFunctionMap(float[] a, float[] b, float[] results) {
-        for (@Parallel int i = 0; i < a.length; i++) {
-            results[i] = a[i] * b[i];
+    public static void testVectorFloat8Storage(VectorFloat8 a, VectorFloat8 results) {
+        for (@Parallel int i = 0; i < a.getLength(); i++) {
+            results.set(i, a.get(i));
         }
     }
 
-    public static void dotProductFunctionReduce(float[] input, float[] results) {
+    public static void dotProductFunctionMap(FloatArray a, FloatArray b, FloatArray results) {
+        for (@Parallel int i = 0; i < a.getSize(); i++) {
+            results.set(i, a.get(i) * b.get(i));
+        }
+    }
+
+    public static void dotProductFunctionReduce(FloatArray input, FloatArray results) {
         float sum = 0.0f;
-        for (int i = 0; i < input.length; i++) {
-            sum += input[i];
+        for (int i = 0; i < input.getSize(); i++) {
+            sum += input.get(i);
         }
-        results[0] = sum;
+        results.set(0, sum);
     }
 
     private static void vectorPhiTest(VectorFloat3 input, VectorFloat3 output) {
@@ -283,8 +300,43 @@ public class TestFloats extends TornadoTestBase {
         }
     }
 
+    private static void vectorComputationMixedTypes(VectorFloat2 a, VectorInt2 b, VectorFloat2 output) {
+        for (@Parallel int i = 0; i < output.getLength(); i++) {
+            Float2 result = Float2.mult(a.get(i), b.get(i));
+            output.set(i, result);
+        }
+    }
+
+    private static void vectorComputationMixedTypes(VectorFloat4 a, VectorInt4 b, VectorFloat4 output) {
+        for (@Parallel int i = 0; i < output.getLength(); i++) {
+            Float4 result = Float4.mult(a.get(i), b.get(i));
+            output.set(i, result);
+        }
+    }
+
+    private static void vectorComputationMixedTypes(VectorFloat8 a, VectorInt8 b, VectorFloat8 output) {
+        for (@Parallel int i = 0; i < output.getLength(); i++) {
+            Float8 result = Float8.mult(a.get(i), b.get(i));
+            output.set(i, result);
+        }
+    }
+
+    private static void vectorComputationMixedTypes(VectorFloat16 a, VectorInt16 b, VectorFloat16 output) {
+        for (@Parallel int i = 0; i < output.getLength(); i++) {
+            Float16 result = Float16.mult(a.get(i), b.get(i));
+            output.set(i, result);
+        }
+    }
+
+    private static void vectorComputationMixedTypes(VectorFloat4 a, VectorFloat4 b, VectorFloat4 output) {
+        for (@Parallel int i = 0; i < output.getLength(); i++) {
+            Float4 result = Float4.mult(a.get(i), b.get(i));
+            output.set(i, result);
+        }
+    }
+
     @Test
-    public void testSimpleDotProductFloat2() {
+    public void testSimpleDotProductFloat2() throws TornadoExecutionPlanException {
         Float2 a = new Float2(1f, 2f);
         Float2 b = new Float2(3f, 2f);
         VectorFloat output = new VectorFloat(1);
@@ -295,14 +347,15 @@ public class TestFloats extends TornadoTestBase {
                 .transferToHost(DataTransferMode.EVERY_EXECUTION, output);
 
         ImmutableTaskGraph immutableTaskGraph = taskGraph.snapshot();
-        TornadoExecutionPlan executionPlan = new TornadoExecutionPlan(immutableTaskGraph);
-        executionPlan.execute();
+        try (TornadoExecutionPlan executionPlan = new TornadoExecutionPlan(immutableTaskGraph)) {
+            executionPlan.execute();
+        }
 
         assertEquals(7, output.get(0), DELTA);
     }
 
     @Test
-    public void testSimpleDotProductFloat3() {
+    public void testSimpleDotProductFloat3() throws TornadoExecutionPlanException {
         Float3 a = new Float3(1f, 2f, 3f);
         Float3 b = new Float3(3f, 2f, 1f);
         VectorFloat output = new VectorFloat(1);
@@ -313,14 +366,15 @@ public class TestFloats extends TornadoTestBase {
                 .transferToHost(DataTransferMode.EVERY_EXECUTION, output);
 
         ImmutableTaskGraph immutableTaskGraph = taskGraph.snapshot();
-        TornadoExecutionPlan executionPlan = new TornadoExecutionPlan(immutableTaskGraph);
-        executionPlan.execute();
+        try (TornadoExecutionPlan executionPlan = new TornadoExecutionPlan(immutableTaskGraph)) {
+            executionPlan.execute();
+        }
 
         assertEquals(10, output.get(0), DELTA);
     }
 
     @Test
-    public void testSimpleDotProductFloat4() {
+    public void testSimpleDotProductFloat4() throws TornadoExecutionPlanException {
         Float4 a = new Float4(1f, 2f, 3f, 4f);
         Float4 b = new Float4(4f, 3f, 2f, 1f);
         VectorFloat output = new VectorFloat(1);
@@ -331,32 +385,15 @@ public class TestFloats extends TornadoTestBase {
                 .transferToHost(DataTransferMode.EVERY_EXECUTION, output);
 
         ImmutableTaskGraph immutableTaskGraph = taskGraph.snapshot();
-        TornadoExecutionPlan executionPlan = new TornadoExecutionPlan(immutableTaskGraph);
-        executionPlan.execute();
+        try (TornadoExecutionPlan executionPlan = new TornadoExecutionPlan(immutableTaskGraph)) {
+            executionPlan.execute();
+        }
 
         assertEquals(20, output.get(0), DELTA);
     }
 
     @Test
-    public void testSimpleDotProductFloat6() {
-        Float6 a = new Float6(1f, 2f, 3f, 4f, 5f, 6f);
-        Float6 b = new Float6(6f, 5f, 4f, 3f, 2f, 1f);
-        VectorFloat output = new VectorFloat(1);
-
-        TaskGraph taskGraph = new TaskGraph("s0") //
-                .transferToDevice(DataTransferMode.FIRST_EXECUTION, a, b) //
-                .task("t0", TestFloats::dotMethodFloat6, a, b, output) //
-                .transferToHost(DataTransferMode.EVERY_EXECUTION, output);
-
-        ImmutableTaskGraph immutableTaskGraph = taskGraph.snapshot();
-        TornadoExecutionPlan executionPlan = new TornadoExecutionPlan(immutableTaskGraph);
-        executionPlan.execute();
-
-        assertEquals(56, output.get(0), DELTA);
-    }
-
-    @Test
-    public void testSimpleDotProductFloat8() {
+    public void testSimpleDotProductFloat8() throws TornadoExecutionPlanException {
         Float8 a = new Float8(1f, 2f, 3f, 4f, 5f, 6f, 7f, 8f);
         Float8 b = new Float8(8f, 7f, 6f, 5f, 4f, 3f, 2f, 1f);
         VectorFloat output = new VectorFloat(1);
@@ -367,14 +404,34 @@ public class TestFloats extends TornadoTestBase {
                 .transferToHost(DataTransferMode.EVERY_EXECUTION, output);
 
         ImmutableTaskGraph immutableTaskGraph = taskGraph.snapshot();
-        TornadoExecutionPlan executionPlan = new TornadoExecutionPlan(immutableTaskGraph);
-        executionPlan.execute();
+        try (TornadoExecutionPlan executionPlan = new TornadoExecutionPlan(immutableTaskGraph)) {
+            executionPlan.execute();
+        }
 
         assertEquals(120, output.get(0), DELTA);
     }
 
     @Test
-    public void testSimpleVectorAddition() {
+    public void testSimpleDotProductFloat16() throws TornadoExecutionPlanException {
+        Float16 a = new Float16(1f, 2f, 3f, 4f, 5f, 6f, 7f, 8f, 0f, 0f, 0f, 0f, 0f, 0f, 0f, 0f);
+        Float16 b = new Float16(8f, 7f, 6f, 5f, 4f, 3f, 2f, 1f, 0f, 0f, 0f, 0f, 0f, 0f, 0f, 0f);
+        VectorFloat output = new VectorFloat(1);
+
+        TaskGraph taskGraph = new TaskGraph("s0") //
+                .transferToDevice(DataTransferMode.FIRST_EXECUTION, a, b) //
+                .task("t0", TestFloats::dotMethodFloat16, a, b, output) //
+                .transferToHost(DataTransferMode.EVERY_EXECUTION, output);
+
+        ImmutableTaskGraph immutableTaskGraph = taskGraph.snapshot();
+        try (TornadoExecutionPlan executionPlan = new TornadoExecutionPlan(immutableTaskGraph)) {
+            executionPlan.execute();
+        }
+
+        assertEquals(120, output.get(0), DELTA);
+    }
+
+    @Test
+    public void testSimpleVectorAddition() throws TornadoExecutionPlanException {
         int size = 1;
         Float3 a = new Float3(1f, 2f, 3f);
         Float3 b = new Float3(3f, 2f, 1f);
@@ -386,8 +443,9 @@ public class TestFloats extends TornadoTestBase {
                 .transferToHost(DataTransferMode.EVERY_EXECUTION, output);
 
         ImmutableTaskGraph immutableTaskGraph = taskGraph.snapshot();
-        TornadoExecutionPlan executionPlan = new TornadoExecutionPlan(immutableTaskGraph);
-        executionPlan.execute();
+        try (TornadoExecutionPlan executionPlan = new TornadoExecutionPlan(immutableTaskGraph)) {
+            executionPlan.execute();
+        }
 
         for (int i = 0; i < size; i++) {
             assertEquals(4, output.get(i).getX(), DELTA);
@@ -397,7 +455,7 @@ public class TestFloats extends TornadoTestBase {
     }
 
     @TornadoNotSupported
-    public void testFloat1() {
+    public void testFloat1() throws TornadoExecutionPlanException {
         int size = 8;
 
         Float[] a = new Float[size];
@@ -415,8 +473,9 @@ public class TestFloats extends TornadoTestBase {
                 .transferToHost(DataTransferMode.EVERY_EXECUTION, output);
 
         ImmutableTaskGraph immutableTaskGraph = taskGraph.snapshot();
-        TornadoExecutionPlan executionPlan = new TornadoExecutionPlan(immutableTaskGraph);
-        executionPlan.execute();
+        try (TornadoExecutionPlan executionPlan = new TornadoExecutionPlan(immutableTaskGraph)) {
+            executionPlan.execute();
+        }
 
         for (int i = 0; i < size; i++) {
             assertEquals(i + i, output[i], DELTA);
@@ -424,7 +483,7 @@ public class TestFloats extends TornadoTestBase {
     }
 
     @TornadoNotSupported
-    public void testFloat2() {
+    public void testFloat2() throws TornadoExecutionPlanException {
         int size = 8;
 
         Float2[] a = new Float2[size];
@@ -442,8 +501,9 @@ public class TestFloats extends TornadoTestBase {
                 .transferToHost(DataTransferMode.EVERY_EXECUTION, output);
 
         ImmutableTaskGraph immutableTaskGraph = taskGraph.snapshot();
-        TornadoExecutionPlan executionPlan = new TornadoExecutionPlan(immutableTaskGraph);
-        executionPlan.execute();
+        try (TornadoExecutionPlan executionPlan = new TornadoExecutionPlan(immutableTaskGraph)) {
+            executionPlan.execute();
+        }
 
         for (int i = 0; i < size; i++) {
             Float2 sequential = new Float2(i + i, i + i);
@@ -453,7 +513,7 @@ public class TestFloats extends TornadoTestBase {
     }
 
     @Test
-    public void testVectorFloat2() {
+    public void testVectorFloat2() throws TornadoExecutionPlanException {
         int size = 16;
 
         VectorFloat2 a = new VectorFloat2(size);
@@ -471,8 +531,9 @@ public class TestFloats extends TornadoTestBase {
                 .transferToHost(DataTransferMode.EVERY_EXECUTION, output);
 
         ImmutableTaskGraph immutableTaskGraph = taskGraph.snapshot();
-        TornadoExecutionPlan executionPlan = new TornadoExecutionPlan(immutableTaskGraph);
-        executionPlan.execute();
+        try (TornadoExecutionPlan executionPlan = new TornadoExecutionPlan(immutableTaskGraph)) {
+            executionPlan.execute();
+        }
 
         for (int i = 0; i < size; i++) {
             Float2 sequential = new Float2(i + (size - i), i + (size - i));
@@ -482,7 +543,7 @@ public class TestFloats extends TornadoTestBase {
     }
 
     @Test
-    public void testVectorFloat3() {
+    public void testVectorFloat3() throws TornadoExecutionPlanException {
         int size = 8;
 
         VectorFloat3 a = new VectorFloat3(size);
@@ -500,8 +561,9 @@ public class TestFloats extends TornadoTestBase {
                 .transferToHost(DataTransferMode.EVERY_EXECUTION, output);
 
         ImmutableTaskGraph immutableTaskGraph = taskGraph.snapshot();
-        TornadoExecutionPlan executionPlan = new TornadoExecutionPlan(immutableTaskGraph);
-        executionPlan.execute();
+        try (TornadoExecutionPlan executionPlan = new TornadoExecutionPlan(immutableTaskGraph)) {
+            executionPlan.execute();
+        }
 
         for (int i = 0; i < size; i++) {
             Float3 sequential = new Float3(i + (size - i), i + (size - i), i + (size - i));
@@ -512,7 +574,7 @@ public class TestFloats extends TornadoTestBase {
     }
 
     @Test
-    public void testVectorFloat3toString() {
+    public void testVectorFloat3toString() throws TornadoExecutionPlanException {
         int size = 2;
 
         VectorFloat3 a = new VectorFloat3(size);
@@ -530,12 +592,13 @@ public class TestFloats extends TornadoTestBase {
                 .transferToHost(DataTransferMode.EVERY_EXECUTION, output);
 
         ImmutableTaskGraph immutableTaskGraph = taskGraph.snapshot();
-        TornadoExecutionPlan executionPlan = new TornadoExecutionPlan(immutableTaskGraph);
-        executionPlan.execute();
+        try (TornadoExecutionPlan executionPlan = new TornadoExecutionPlan(immutableTaskGraph)) {
+            executionPlan.execute();
+        }
     }
 
     @Test
-    public void testVectorFloat4() {
+    public void testVectorFloat4() throws TornadoExecutionPlanException {
 
         int size = 8;
 
@@ -554,8 +617,9 @@ public class TestFloats extends TornadoTestBase {
                 .transferToHost(DataTransferMode.EVERY_EXECUTION, output);
 
         ImmutableTaskGraph immutableTaskGraph = taskGraph.snapshot();
-        TornadoExecutionPlan executionPlan = new TornadoExecutionPlan(immutableTaskGraph);
-        executionPlan.execute();
+        try (TornadoExecutionPlan executionPlan = new TornadoExecutionPlan(immutableTaskGraph)) {
+            executionPlan.execute();
+        }
 
         for (int i = 0; i < size; i++) {
             Float4 sequential = new Float4(i + (size - i), i + (size - i), i + (size - i), i + size);
@@ -567,7 +631,52 @@ public class TestFloats extends TornadoTestBase {
     }
 
     @Test
-    public void testVectorFloat8() {
+    public void testVectorFloat16() throws TornadoExecutionPlanException {
+        int size = 16;
+
+        VectorFloat16 a = new VectorFloat16(size);
+        VectorFloat16 b = new VectorFloat16(size);
+        VectorFloat16 output = new VectorFloat16(size);
+
+        for (int i = 0; i < size; i++) {
+            a.set(i, new Float16(i, i, i, i, i, i, i, i, i, i, i, i, i, i, i, i));
+            b.set(i, new Float16(size - i, size - i, size - i, size, size - i, size - i, size - i, size, size - i, size - i, size - i, size, size - i, size - i, size - i, size));
+        }
+
+        TaskGraph taskGraph = new TaskGraph("s0") //
+                .transferToDevice(DataTransferMode.FIRST_EXECUTION, a, b) //
+                .task("t0", TestFloats::addVectorFloat16, a, b, output) //
+                .transferToHost(DataTransferMode.EVERY_EXECUTION, output);
+
+        ImmutableTaskGraph immutableTaskGraph = taskGraph.snapshot();
+        try (TornadoExecutionPlan executionPlan = new TornadoExecutionPlan(immutableTaskGraph)) {
+            executionPlan.execute();
+        }
+
+        for (int i = 0; i < size; i++) {
+            Float16 sequential = new Float16(i + (size - i), i + (size - i), i + (size - i), i + size, i + (size - i), i + (size - i), i + (size - i), i + size, i + (size - i), i + (size - i),
+                    i + (size - i), i + size, i + (size - i), i + (size - i), i + (size - i), i + size);
+            assertEquals(sequential.getS0(), output.get(i).getS0(), DELTA);
+            assertEquals(sequential.getS1(), output.get(i).getS1(), DELTA);
+            assertEquals(sequential.getS2(), output.get(i).getS2(), DELTA);
+            assertEquals(sequential.getS3(), output.get(i).getS3(), DELTA);
+            assertEquals(sequential.getS4(), output.get(i).getS4(), DELTA);
+            assertEquals(sequential.getS5(), output.get(i).getS5(), DELTA);
+            assertEquals(sequential.getS6(), output.get(i).getS6(), DELTA);
+            assertEquals(sequential.getS7(), output.get(i).getS7(), DELTA);
+            assertEquals(sequential.getS8(), output.get(i).getS8(), DELTA);
+            assertEquals(sequential.getS9(), output.get(i).getS9(), DELTA);
+            assertEquals(sequential.getS10(), output.get(i).getS10(), DELTA);
+            assertEquals(sequential.getS11(), output.get(i).getS11(), DELTA);
+            assertEquals(sequential.getS12(), output.get(i).getS12(), DELTA);
+            assertEquals(sequential.getS13(), output.get(i).getS13(), DELTA);
+            assertEquals(sequential.getS14(), output.get(i).getS14(), DELTA);
+            assertEquals(sequential.getS15(), output.get(i).getS15(), DELTA);
+        }
+    }
+
+    @Test
+    public void testVectorFloat8() throws TornadoExecutionPlanException {
         int size = 8;
 
         VectorFloat8 a = new VectorFloat8(size);
@@ -585,8 +694,9 @@ public class TestFloats extends TornadoTestBase {
                 .transferToHost(DataTransferMode.EVERY_EXECUTION, output);
 
         ImmutableTaskGraph immutableTaskGraph = taskGraph.snapshot();
-        TornadoExecutionPlan executionPlan = new TornadoExecutionPlan(immutableTaskGraph);
-        executionPlan.execute();
+        try (TornadoExecutionPlan executionPlan = new TornadoExecutionPlan(immutableTaskGraph)) {
+            executionPlan.execute();
+        }
 
         for (int i = 0; i < size; i++) {
             Float8 sequential = new Float8(i + (size - i), i + (size - i), i + (size - i), i + size, i + (size - i), i + (size - i), i + (size - i), i + size);
@@ -602,7 +712,7 @@ public class TestFloats extends TornadoTestBase {
     }
 
     @Test
-    public void testVectorFloat8_Storage() {
+    public void testVectorFloat8_Storage() throws TornadoExecutionPlanException {
         int size = 8;
 
         VectorFloat8 a = new VectorFloat8(size);
@@ -614,12 +724,13 @@ public class TestFloats extends TornadoTestBase {
 
         TaskGraph taskGraph = new TaskGraph("s0") //
                 .transferToDevice(DataTransferMode.FIRST_EXECUTION, a) //
-                .task("t0", TestFloats::addVectorFloat8Storage, a, output) //
+                .task("t0", TestFloats::testVectorFloat8Storage, a, output) //
                 .transferToHost(DataTransferMode.EVERY_EXECUTION, output);
 
         ImmutableTaskGraph immutableTaskGraph = taskGraph.snapshot();
-        TornadoExecutionPlan executionPlan = new TornadoExecutionPlan(immutableTaskGraph);
-        executionPlan.execute();
+        try (TornadoExecutionPlan executionPlan = new TornadoExecutionPlan(immutableTaskGraph)) {
+            executionPlan.execute();
+        }
 
         for (int i = 0; i < size; i++) {
             Float8 sequential = new Float8(i, i, i, i, i, i, i, i);
@@ -635,22 +746,22 @@ public class TestFloats extends TornadoTestBase {
     }
 
     @Test
-    public void testDotProduct() {
+    public void testDotProduct() throws TornadoExecutionPlanException {
 
         int size = 8;
 
-        float[] a = new float[size];
-        float[] b = new float[size];
-        float[] outputMap = new float[size];
-        float[] outputReduce = new float[1];
+        FloatArray a = new FloatArray(size);
+        FloatArray b = new FloatArray(size);
+        FloatArray outputMap = new FloatArray(size);
+        FloatArray outputReduce = new FloatArray(1);
 
-        float[] seqMap = new float[size];
-        float[] seqReduce = new float[1];
+        FloatArray seqMap = new FloatArray(size);
+        FloatArray seqReduce = new FloatArray(1);
 
         Random r = new Random();
         for (int i = 0; i < size; i++) {
-            a[i] = r.nextFloat();
-            b[i] = r.nextFloat();
+            a.set(i, r.nextFloat());
+            b.set(i, r.nextFloat());
         }
 
         // Sequential computation
@@ -664,14 +775,15 @@ public class TestFloats extends TornadoTestBase {
                 .transferToHost(DataTransferMode.EVERY_EXECUTION, outputReduce);
 
         ImmutableTaskGraph immutableTaskGraph = taskGraph.snapshot();
-        TornadoExecutionPlan executionPlan = new TornadoExecutionPlan(immutableTaskGraph);
-        executionPlan.execute();
+        try (TornadoExecutionPlan executionPlan = new TornadoExecutionPlan(immutableTaskGraph)) {
+            executionPlan.execute();
+        }
 
-        assertEquals(seqReduce[0], outputReduce[0], DELTA);
+        assertEquals(seqReduce.get(0), outputReduce.get(0), DELTA);
     }
 
     @Test
-    public void vectorPhiTest() {
+    public void vectorPhiTest() throws TornadoExecutionPlanException {
 
         final VectorFloat3 input = new VectorFloat3(8);
         final VectorFloat3 output = new VectorFloat3(1);
@@ -684,8 +796,9 @@ public class TestFloats extends TornadoTestBase {
                 .transferToHost(DataTransferMode.EVERY_EXECUTION, output);
 
         ImmutableTaskGraph immutableTaskGraph = taskGraph.snapshot();
-        TornadoExecutionPlan executionPlan = new TornadoExecutionPlan(immutableTaskGraph);
-        executionPlan.execute();
+        try (TornadoExecutionPlan executionPlan = new TornadoExecutionPlan(immutableTaskGraph)) {
+            executionPlan.execute();
+        }
 
         assertEquals(8.0f, output.get(0).getS0(), DELTA);
         assertEquals(8.0f, output.get(0).getS1(), DELTA);
@@ -694,7 +807,7 @@ public class TestFloats extends TornadoTestBase {
     }
 
     @Test
-    public void privateVectorFloat2() {
+    public void privateVectorFloat2() throws TornadoExecutionPlanException {
         int size = 16;
         VectorFloat2 sequentialOutput = new VectorFloat2(size);
         VectorFloat2 tornadoOutput = new VectorFloat2(size);
@@ -704,8 +817,9 @@ public class TestFloats extends TornadoTestBase {
         taskGraph.transferToHost(DataTransferMode.EVERY_EXECUTION, tornadoOutput);
 
         ImmutableTaskGraph immutableTaskGraph = taskGraph.snapshot();
-        TornadoExecutionPlan executionPlan = new TornadoExecutionPlan(immutableTaskGraph);
-        executionPlan.execute();
+        try (TornadoExecutionPlan executionPlan = new TornadoExecutionPlan(immutableTaskGraph)) {
+            executionPlan.execute();
+        }
 
         testPrivateVectorFloat2(sequentialOutput);
 
@@ -716,7 +830,7 @@ public class TestFloats extends TornadoTestBase {
     }
 
     @Test
-    public void privateVectorFloat4() {
+    public void privateVectorFloat4() throws TornadoExecutionPlanException {
         int size = 16;
         VectorFloat4 sequentialOutput = new VectorFloat4(size);
         VectorFloat4 tornadoOutput = new VectorFloat4(size);
@@ -726,8 +840,9 @@ public class TestFloats extends TornadoTestBase {
         taskGraph.transferToHost(DataTransferMode.EVERY_EXECUTION, tornadoOutput);
 
         ImmutableTaskGraph immutableTaskGraph = taskGraph.snapshot();
-        TornadoExecutionPlan executionPlan = new TornadoExecutionPlan(immutableTaskGraph);
-        executionPlan.execute();
+        try (TornadoExecutionPlan executionPlan = new TornadoExecutionPlan(immutableTaskGraph)) {
+            executionPlan.execute();
+        }
 
         testPrivateVectorFloat4(sequentialOutput);
 
@@ -740,7 +855,7 @@ public class TestFloats extends TornadoTestBase {
     }
 
     @Test
-    public void privateVectorFloat8() {
+    public void privateVectorFloat8() throws TornadoExecutionPlanException {
         int size = 16;
         VectorFloat8 sequentialOutput = new VectorFloat8(16);
         VectorFloat8 tornadoOutput = new VectorFloat8(16);
@@ -750,8 +865,9 @@ public class TestFloats extends TornadoTestBase {
         taskGraph.transferToHost(DataTransferMode.EVERY_EXECUTION, tornadoOutput);
 
         ImmutableTaskGraph immutableTaskGraph = taskGraph.snapshot();
-        TornadoExecutionPlan executionPlan = new TornadoExecutionPlan(immutableTaskGraph);
-        executionPlan.execute();
+        try (TornadoExecutionPlan executionPlan = new TornadoExecutionPlan(immutableTaskGraph)) {
+            executionPlan.execute();
+        }
 
         testPrivateVectorFloat8(sequentialOutput);
 
@@ -768,7 +884,7 @@ public class TestFloats extends TornadoTestBase {
     }
 
     @Test
-    public void testVectorFloat4_Unary() {
+    public void testVectorFloat4_Unary() throws TornadoExecutionPlanException {
         int size = 256;
         VectorFloat4 sequentialOutput = new VectorFloat4(size);
         VectorFloat4 output = new VectorFloat4(size);
@@ -778,8 +894,9 @@ public class TestFloats extends TornadoTestBase {
         taskGraph.transferToHost(DataTransferMode.EVERY_EXECUTION, output);
 
         ImmutableTaskGraph immutableTaskGraph = taskGraph.snapshot();
-        TornadoExecutionPlan executionPlan = new TornadoExecutionPlan(immutableTaskGraph);
-        executionPlan.execute();
+        try (TornadoExecutionPlan executionPlan = new TornadoExecutionPlan(immutableTaskGraph)) {
+            executionPlan.execute();
+        }
 
         vectorFloatUnary(sequentialOutput);
 
@@ -792,7 +909,7 @@ public class TestFloats extends TornadoTestBase {
     }
 
     @Test
-    public void testInternalSetMethod01() {
+    public void testInternalSetMethod01() throws TornadoExecutionPlanException {
         final int size = 16;
         VectorFloat2 tornadoInput = new VectorFloat2(size);
         VectorFloat2 sequentialInput = new VectorFloat2(size);
@@ -812,9 +929,9 @@ public class TestFloats extends TornadoTestBase {
                 .transferToHost(DataTransferMode.EVERY_EXECUTION, tornadoOutput);
 
         ImmutableTaskGraph immutableTaskGraph = graph.snapshot();
-        TornadoExecutionPlan executionPlan = new TornadoExecutionPlan(immutableTaskGraph);
-
-        executionPlan.execute();
+        try (TornadoExecutionPlan executionPlan = new TornadoExecutionPlan(immutableTaskGraph)) {
+            executionPlan.execute();
+        }
 
         vectorComputation01(sequentialInput, sequentialOutput);
 
@@ -825,7 +942,7 @@ public class TestFloats extends TornadoTestBase {
     }
 
     @Test
-    public void testInternalSetMethod02() {
+    public void testInternalSetMethod02() throws TornadoExecutionPlanException {
         final int size = 16;
         VectorFloat3 tornadoInput = new VectorFloat3(size);
         VectorFloat3 sequentialInput = new VectorFloat3(size);
@@ -845,9 +962,9 @@ public class TestFloats extends TornadoTestBase {
                 .transferToHost(DataTransferMode.EVERY_EXECUTION, tornadoOutput);
 
         ImmutableTaskGraph immutableTaskGraph = graph.snapshot();
-        TornadoExecutionPlan executionPlan = new TornadoExecutionPlan(immutableTaskGraph);
-
-        executionPlan.execute();
+        try (TornadoExecutionPlan executionPlan = new TornadoExecutionPlan(immutableTaskGraph)) {
+            executionPlan.execute();
+        }
 
         vectorComputation02(sequentialInput, sequentialOutput);
 
@@ -859,7 +976,7 @@ public class TestFloats extends TornadoTestBase {
     }
 
     @Test
-    public void testInternalSetMethod03() {
+    public void testInternalSetMethod03() throws TornadoExecutionPlanException {
         final int size = 16;
         VectorFloat4 tornadoInput = new VectorFloat4(size);
         VectorFloat4 sequentialInput = new VectorFloat4(size);
@@ -879,9 +996,9 @@ public class TestFloats extends TornadoTestBase {
                 .transferToHost(DataTransferMode.EVERY_EXECUTION, tornadoOutput);
 
         ImmutableTaskGraph immutableTaskGraph = graph.snapshot();
-        TornadoExecutionPlan executionPlan = new TornadoExecutionPlan(immutableTaskGraph);
-
-        executionPlan.execute();
+        try (TornadoExecutionPlan executionPlan = new TornadoExecutionPlan(immutableTaskGraph)) {
+            executionPlan.execute();
+        }
 
         vectorComputation03(sequentialInput, sequentialOutput);
 
@@ -893,7 +1010,7 @@ public class TestFloats extends TornadoTestBase {
     }
 
     @Test
-    public void testInternalSetMethod04() {
+    public void testInternalSetMethod04() throws TornadoExecutionPlanException {
         final int size = 16;
         VectorFloat8 tornadoInput = new VectorFloat8(size);
         VectorFloat8 sequentialInput = new VectorFloat8(size);
@@ -913,15 +1030,200 @@ public class TestFloats extends TornadoTestBase {
                 .transferToHost(DataTransferMode.EVERY_EXECUTION, tornadoOutput);
 
         ImmutableTaskGraph immutableTaskGraph = graph.snapshot();
-        TornadoExecutionPlan executionPlan = new TornadoExecutionPlan(immutableTaskGraph);
-
-        executionPlan.execute();
+        try (TornadoExecutionPlan executionPlan = new TornadoExecutionPlan(immutableTaskGraph)) {
+            executionPlan.execute();
+        }
 
         vectorComputation04(sequentialInput, sequentialOutput);
 
         for (int i = 0; i < size; i++) {
             assertEquals(sequentialOutput.get(i).getX(), tornadoOutput.get(i).getX(), DELTA);
             assertEquals(sequentialOutput.get(i).getY(), tornadoOutput.get(i).getY(), DELTA);
+        }
+    }
+
+    @Test(timeout = 1000) //timeout of 1sec
+    public void testAllocationIssue() {
+        int size = 8192 * 4096;
+
+        VectorFloat4 buffer = new VectorFloat4(size);
+        for (int x = 0; x < size; x++) {
+            buffer.set(x, new Float4(x, x, x, x));
+        }
+    }
+
+    @Test
+    public void testVectorFloat4Float4() throws TornadoExecutionPlanException {
+        int size = 8192;
+        VectorFloat4 a = new VectorFloat4(size);
+        VectorFloat4 b = new VectorFloat4(size);
+        VectorFloat4 output = new VectorFloat4(size);
+        VectorFloat4 seq = new VectorFloat4(size);
+
+        for (int x = 0; x < b.getLength(); x++) {
+            a.set(x, new Float4(x, x, x, x));
+            b.set(x, new Float4(0, 1, 2, 3));
+        }
+
+        TaskGraph graph = new TaskGraph("s0") //
+                .transferToDevice(DataTransferMode.EVERY_EXECUTION, a, b) //
+                .task("t0", TestFloats::vectorComputationMixedTypes, a, b, output) //
+                .transferToHost(DataTransferMode.EVERY_EXECUTION, output);
+
+        ImmutableTaskGraph immutableTaskGraph = graph.snapshot();
+
+        vectorComputationMixedTypes(a, b, seq);
+
+        try (TornadoExecutionPlan executionPlan = new TornadoExecutionPlan(immutableTaskGraph)) {
+            executionPlan.execute();
+            for (int i = 0; i < size; i++) {
+                assertEquals(seq.get(i).getX(), output.get(i).getX(), DELTA);
+                assertEquals(seq.get(i).getY(), output.get(i).getY(), DELTA);
+                assertEquals(seq.get(i).getZ(), output.get(i).getZ(), DELTA);
+                assertEquals(seq.get(i).getW(), output.get(i).getW(), DELTA);
+            }
+        }
+    }
+
+    @Test
+    public void testVectorFloat2Int2() throws TornadoExecutionPlanException {
+        int size = 8192;
+        VectorFloat2 a = new VectorFloat2(size);
+        VectorInt2 b = new VectorInt2(size);
+        VectorFloat2 output = new VectorFloat2(size);
+        VectorFloat2 seq = new VectorFloat2(size);
+
+        Random r = new Random();
+        for (int i = 0; i < b.getLength(); i++) {
+            a.set(i, new Float2(r.nextFloat(), r.nextFloat()));
+            b.set(i, new Int2(r.nextInt(), r.nextInt()));
+        }
+
+        TaskGraph graph = new TaskGraph("s0") //
+                .transferToDevice(DataTransferMode.EVERY_EXECUTION, a, b) //
+                .task("t0", TestFloats::vectorComputationMixedTypes, a, b, output) //
+                .transferToHost(DataTransferMode.EVERY_EXECUTION, output);
+
+        ImmutableTaskGraph immutableTaskGraph = graph.snapshot();
+
+        vectorComputationMixedTypes(a, b, seq);
+
+        try (TornadoExecutionPlan executionPlan = new TornadoExecutionPlan(immutableTaskGraph)) {
+            executionPlan.execute();
+            for (int i = 0; i < size; i++) {
+                assertEquals(seq.get(i).getX(), output.get(i).getX(), DELTA);
+                assertEquals(seq.get(i).getY(), output.get(i).getY(), DELTA);
+            }
+        }
+    }
+
+    @Test
+    public void testVectorFloat4Int4() throws TornadoExecutionPlanException {
+        int size = 8192;
+        VectorFloat4 a = new VectorFloat4(size);
+        VectorInt4 b = new VectorInt4(size);
+        VectorFloat4 output = new VectorFloat4(size);
+        VectorFloat4 seq = new VectorFloat4(size);
+
+        Random r = new Random();
+        for (int i = 0; i < b.getLength(); i++) {
+            a.set(i, new Float4(r.nextFloat(), r.nextFloat(), r.nextFloat(), r.nextFloat()));
+            b.set(i, new Int4(r.nextInt(), r.nextInt(), r.nextInt(), r.nextInt()));
+        }
+
+        TaskGraph graph = new TaskGraph("s0") //
+                .transferToDevice(DataTransferMode.EVERY_EXECUTION, a, b) //
+                .task("t0", TestFloats::vectorComputationMixedTypes, a, b, output) //
+                .transferToHost(DataTransferMode.EVERY_EXECUTION, output);
+
+        ImmutableTaskGraph immutableTaskGraph = graph.snapshot();
+
+        vectorComputationMixedTypes(a, b, seq);
+
+        try (TornadoExecutionPlan executionPlan = new TornadoExecutionPlan(immutableTaskGraph)) {
+            executionPlan.execute();
+            for (int i = 0; i < size; i++) {
+                assertEquals(seq.get(i).getX(), output.get(i).getX(), DELTA);
+                assertEquals(seq.get(i).getY(), output.get(i).getY(), DELTA);
+                assertEquals(seq.get(i).getZ(), output.get(i).getZ(), DELTA);
+                assertEquals(seq.get(i).getW(), output.get(i).getW(), DELTA);
+            }
+        }
+    }
+
+    @Test
+    public void testVectorFloat8Int8() throws TornadoExecutionPlanException {
+        int size = 8192;
+        VectorFloat8 a = new VectorFloat8(size);
+        VectorInt8 b = new VectorInt8(size);
+        VectorFloat8 output = new VectorFloat8(size);
+        VectorFloat8 seq = new VectorFloat8(size);
+
+        Random r = new Random();
+        IntStream.range(0, b.getLength()).forEach(i -> {
+            Float8 vectorFloat = new Float8();
+            IntStream.range(0, vectorFloat.size()).forEach(j -> vectorFloat.set(j, r.nextFloat()));
+            a.set(i, vectorFloat);
+            Int8 vectorInt = new Int8();
+            IntStream.range(0, vectorInt.size()).forEach(j -> vectorInt.set(j, r.nextInt()));
+            b.set(i, vectorInt);
+        });
+
+        TaskGraph graph = new TaskGraph("s0") //
+                .transferToDevice(DataTransferMode.EVERY_EXECUTION, a, b) //
+                .task("t0", TestFloats::vectorComputationMixedTypes, a, b, output) //
+                .transferToHost(DataTransferMode.EVERY_EXECUTION, output);
+
+        ImmutableTaskGraph immutableTaskGraph = graph.snapshot();
+
+        vectorComputationMixedTypes(a, b, seq);
+
+        try (TornadoExecutionPlan executionPlan = new TornadoExecutionPlan(immutableTaskGraph)) {
+            executionPlan.execute();
+            for (int i = 0; i < size; i++) {
+                for (int k = 0; k < 8; k++) {
+                    assertEquals(seq.get(i).get(k), output.get(i).get(k), DELTA);
+                }
+            }
+        }
+    }
+
+    @Test
+    public void testVectorFloat16Int16() throws TornadoExecutionPlanException {
+        int size = 8192;
+        VectorFloat16 a = new VectorFloat16(size);
+        VectorInt16 b = new VectorInt16(size);
+        VectorFloat16 output = new VectorFloat16(size);
+        VectorFloat16 seq = new VectorFloat16(size);
+
+        Random r = new Random();
+        IntStream.range(0, b.getLength()).forEach(i -> {
+
+            Float16 vectorFloat = new Float16();
+            IntStream.range(0, vectorFloat.size()).forEach(j -> vectorFloat.set(j, r.nextFloat()));
+            a.set(i, vectorFloat);
+
+            Int16 vectorInt = new Int16();
+            IntStream.range(0, vectorInt.size()).forEach(j -> vectorInt.set(j, r.nextInt()));
+            b.set(i, vectorInt);
+        });
+
+        TaskGraph graph = new TaskGraph("s0") //
+                .transferToDevice(DataTransferMode.EVERY_EXECUTION, a, b) //
+                .task("t0", TestFloats::vectorComputationMixedTypes, a, b, output) //
+                .transferToHost(DataTransferMode.EVERY_EXECUTION, output);
+
+        ImmutableTaskGraph immutableTaskGraph = graph.snapshot();
+
+        vectorComputationMixedTypes(a, b, seq);
+
+        try (TornadoExecutionPlan executionPlan = new TornadoExecutionPlan(immutableTaskGraph)) {
+            executionPlan.execute();
+            for (int i = 0; i < size; i++) {
+                for (int k = 0; k < 16; k++) {
+                    assertEquals(seq.get(i).get(k), output.get(i).get(k), DELTA);
+                }
+            }
         }
     }
 

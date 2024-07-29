@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018, 2020-2022 APT Group, Department of Computer Science,
+ * Copyright (c) 2018, 2020-2022, 2024, APT Group, Department of Computer Science,
  * The University of Manchester. All rights reserved.
  * Copyright (c) 2009, 2017, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
@@ -10,15 +10,13 @@
  *
  * This code is distributed in the hope that it will be useful, but WITHOUT
  * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
- * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License
  * version 2 for more details (a copy is included in the LICENSE file that
  * accompanied this code).
  *
  * You should have received a copy of the GNU General Public License version
  * 2 along with this work; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
- *
- * Authors: James Clarkson
  *
  */
 package uk.ac.manchester.tornado.drivers.opencl.graal.lir;
@@ -109,6 +107,147 @@ public class OCLLIRStmt {
         public Value getExpr() {
             return rhs;
         }
+    }
+
+    @Opcode("VADD_HALF")
+    public static class VectorAddHalfStmt extends AbstractInstruction {
+
+        public static final LIRInstructionClass<VectorAddHalfStmt> TYPE = LIRInstructionClass.create(VectorAddHalfStmt.class);
+
+        @Def
+        protected Value result;
+        @Use
+        protected Value x;
+        @Use
+        protected Value y;
+
+        public VectorAddHalfStmt(Value result, Value x, Value y) {
+            super(TYPE);
+            this.result = result;
+            this.x = x;
+            this.y = y;
+        }
+
+        @Override
+        public void emitCode(OCLCompilationResultBuilder crb, OCLAssembler asm) {
+            asm.indent();
+            asm.emitValue(crb, result);
+            asm.space();
+            asm.assign();
+            asm.space();
+            if (x instanceof OCLVectorElementSelect) {
+                OCLVectorElementSelect selectX = (OCLVectorElementSelect) x;
+                selectX.emit(crb, asm);
+            } else {
+                asm.emitValue(crb, x);
+            }
+            asm.space();
+            asm.emitSymbol("+");
+            asm.space();
+            if (y instanceof OCLVectorElementSelect) {
+                OCLVectorElementSelect selectY = (OCLVectorElementSelect) y;
+                selectY.emit(crb, asm);
+            } else {
+                asm.emitValue(crb, y);
+            }
+            asm.delimiter();
+            asm.eol();
+        }
+
+    }
+
+    @Opcode("VSUB_HALF")
+    public static class VectorSubHalfStmt extends AbstractInstruction {
+
+        public static final LIRInstructionClass<VectorSubHalfStmt> TYPE = LIRInstructionClass.create(VectorSubHalfStmt.class);
+
+        @Def
+        protected Value result;
+        @Use
+        protected Value x;
+        @Use
+        protected Value y;
+
+        public VectorSubHalfStmt(Value result, Value x, Value y) {
+            super(TYPE);
+            this.result = result;
+            this.x = x;
+            this.y = y;
+        }
+
+        @Override
+        public void emitCode(OCLCompilationResultBuilder crb, OCLAssembler asm) {
+            asm.indent();
+            asm.emitValue(crb, result);
+            asm.space();
+            asm.assign();
+            asm.space();
+            if (x instanceof OCLVectorElementSelect) {
+                OCLVectorElementSelect selectX = (OCLVectorElementSelect) x;
+                selectX.emit(crb, asm);
+            } else {
+                asm.emitValue(crb, x);
+            }
+            asm.space();
+            asm.emitSymbol("-");
+            asm.space();
+            if (y instanceof OCLVectorElementSelect) {
+                OCLVectorElementSelect selectY = (OCLVectorElementSelect) y;
+                selectY.emit(crb, asm);
+            } else {
+                asm.emitValue(crb, y);
+            }
+            asm.delimiter();
+            asm.eol();
+        }
+
+    }
+
+    @Opcode("VMULT_HALF")
+    public static class VectorMultHalfStmt extends AbstractInstruction {
+
+        public static final LIRInstructionClass<VectorMultHalfStmt> TYPE = LIRInstructionClass.create(VectorMultHalfStmt.class);
+
+        @Def
+        protected Value result;
+        @Use
+        protected Value x;
+        @Use
+        protected Value y;
+
+        public VectorMultHalfStmt(Value result, Value x, Value y) {
+            super(TYPE);
+            this.result = result;
+            this.x = x;
+            this.y = y;
+        }
+
+        @Override
+        public void emitCode(OCLCompilationResultBuilder crb, OCLAssembler asm) {
+            asm.indent();
+            asm.emitValue(crb, result);
+            asm.space();
+            asm.assign();
+            asm.space();
+            if (x instanceof OCLVectorElementSelect) {
+                OCLVectorElementSelect selectX = (OCLVectorElementSelect) x;
+                selectX.emit(crb, asm);
+            } else {
+                asm.emitValue(crb, x);
+            }
+            asm.space();
+            asm.emitSymbol("*");
+            asm.space();
+            if (y instanceof OCLVectorElementSelect) {
+                OCLVectorElementSelect selectY = (OCLVectorElementSelect) y;
+                selectY.emit(crb, asm);
+            } else {
+                asm.emitValue(crb, y);
+            }
+            asm.delimiter();
+            asm.eol();
+        }
+
     }
 
     @Opcode("MOVE")
@@ -332,14 +471,14 @@ public class OCLLIRStmt {
          * It emits code in the form:
          *
          * <code>
-         *     ul_12[index] = value;
+         * ul_12[index] = value;
          * </code>
          *
          * @param crb
-         *            OpenCL Compilation Result Builder
+         *     OpenCL Compilation Result Builder
          *
          * @param asm
-         *            OpenCL Assembler
+         *     OpenCL Assembler
          */
         public void emitLocalAndPrivateStore(OCLCompilationResultBuilder crb, OCLAssembler asm) {
             address.emit(crb, asm);
@@ -358,14 +497,14 @@ public class OCLLIRStmt {
          * It emits code in the form:
          *
          * <code>
-         *     *((__global <type> *) ul_13) = <value>
+         * *((__global <type> *) ul_13) = <value>
          * </code>
          *
          * @param crb
-         *            OpenCL Compilation Result Builder
+         *     OpenCL Compilation Result Builder
          *
          * @param asm
-         *            OpenCL Assembler
+         *     OpenCL Assembler
          */
         public void emitGlobalStore(OCLCompilationResultBuilder crb, OCLAssembler asm) {
             asm.emit("*(");
@@ -545,7 +684,7 @@ public class OCLLIRStmt {
         private void emitAtomicAddStore(OCLCompilationResultBuilder crb, OCLAssembler asm) {
             asm.indent();
             asm.emit("atomicAdd_Tornado_Floats( &("); // Calling to the
-                                                      // intrinsic for Floats
+                                                     // intrinsic for Floats
             asm.emit("*(");
             cast.emit(crb, asm);
             asm.space();

@@ -12,15 +12,13 @@
  *
  * This code is distributed in the hope that it will be useful, but WITHOUT
  * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
- * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License
  * version 2 for more details (a copy is included in the LICENSE file that
  * accompanied this code).
  *
  * You should have received a copy of the GNU General Public License version
  * 2 along with this work; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
- *
- *
  */
 package uk.ac.manchester.tornado.runtime.graph;
 
@@ -30,7 +28,7 @@ import java.util.BitSet;
 
 import uk.ac.manchester.tornado.api.exceptions.TornadoRuntimeException;
 import uk.ac.manchester.tornado.runtime.common.BatchConfiguration;
-import uk.ac.manchester.tornado.runtime.common.Tornado;
+import uk.ac.manchester.tornado.runtime.common.TornadoLogger;
 import uk.ac.manchester.tornado.runtime.common.TornadoOptions;
 import uk.ac.manchester.tornado.runtime.graph.nodes.AbstractNode;
 import uk.ac.manchester.tornado.runtime.graph.nodes.ContextOpNode;
@@ -41,9 +39,9 @@ public class TornadoVMGraphCompiler {
      * It generates the TornadoVM byte-codes from a Tornado Task Graph.
      *
      * @param graph
-     *            TornadoVM execution Graph.
+     *     TornadoVM execution Graph.
      * @param executionContext
-     *            TornadoVM execution executionContext.
+     *     TornadoVM execution executionContext.
      * @return {@link TornadoVMBytecodeBuilder[]}
      */
     public static TornadoVMBytecodeResult[] compile(TornadoGraph graph, TornadoExecutionContext executionContext) {
@@ -63,7 +61,7 @@ public class TornadoVMGraphCompiler {
 
         intermediateTornadoGraph.analyzeDependencies();
 
-        Tornado.debug("Compiling bytecodes...");
+        new TornadoLogger().debug("Compiling bytecodes...");
 
         for (int i = 0; i < tornadoVMBytecodeResults.length; i++) {
 
@@ -73,10 +71,11 @@ public class TornadoVMGraphCompiler {
             tornadoVMBytecodeBuilder.begin(1, 1, intermediateTornadoGraph.getNumberOfDependencies() + 1);
 
             // Generate bytecodes with no batches
-            if (executionContext.getBatchSize() == -1) {
+            if (executionContext.getBatchSize() == TornadoExecutionContext.INIT_VALUE) {
                 scheduleAndEmitTornadoVMBytecodes(tornadoVMBytecodeBuilder, graph, intermediateTornadoGraph, 0, 0, 0, i, executionContext);
             } else {
-                // Generate bytecodes with batches
+                // Generate bytecodes for batch processing.
+                // It splits the iteration space and the input arrays into batches
                 scheduleBatchDependentBytecodes(executionContext, tornadoVMBytecodeBuilder, graph, intermediateTornadoGraph);
             }
 
@@ -118,31 +117,27 @@ public class TornadoVMGraphCompiler {
 
         BatchConfiguration batchConfiguration = BatchConfiguration.computeChunkSizes(executionContext, batchSize);
 
-        assert batchConfiguration != null;
-
         long offset = 0;
-        long nthreads = batchSize / batchConfiguration.getNumBytesType();
+        long numberOfThreads = batchSize / batchConfiguration.getNumBytesType();
         for (int i = 0; i < batchConfiguration.getTotalChunks(); i++) {
             offset = (batchSize * i);
-            scheduleAndEmitTornadoVMBytecodes(tornadoVMBytecodeBuilder, graph, intermediateTornadoGraph, offset, batchSize, nthreads, 1, executionContext);
+            scheduleAndEmitTornadoVMBytecodes(tornadoVMBytecodeBuilder, graph, intermediateTornadoGraph, offset, batchSize, numberOfThreads, 1, executionContext);
         }
         // Last chunk
         if (batchConfiguration.getRemainingChunkSize() != 0) {
             offset += (batchSize);
-            nthreads = batchConfiguration.getRemainingChunkSize() / batchConfiguration.getNumBytesType();
+            numberOfThreads = batchConfiguration.getRemainingChunkSize() / batchConfiguration.getNumBytesType();
             long realBatchSize = batchConfiguration.getTotalChunks() == 0 ? 0 : batchConfiguration.getRemainingChunkSize();
             long realOffsetSize = batchConfiguration.getTotalChunks() == 0 ? 0 : offset;
-            scheduleAndEmitTornadoVMBytecodes(tornadoVMBytecodeBuilder, graph, intermediateTornadoGraph, realOffsetSize, realBatchSize, nthreads, 1, executionContext);
+            scheduleAndEmitTornadoVMBytecodes(tornadoVMBytecodeBuilder, graph, intermediateTornadoGraph, realOffsetSize, realBatchSize, numberOfThreads, 1, executionContext);
         }
     }
 
     private static void synchronizeOperationLastByteCode(TornadoVMBytecodeBuilder result, int numDepLists) {
         final byte[] code = result.getCode();
-        final int codeSize = result.getCodeSize();
-        if (code[codeSize - 13] == TornadoVMBytecodes.TRANSFER_DEVICE_TO_HOST_ALWAYS.value()) {
-            code[codeSize - 13] = TornadoVMBytecodes.TRANSFER_DEVICE_TO_HOST_ALWAYS_BLOCKING.value();
-        } else if (code[codeSize - 29] == TornadoVMBytecodes.TRANSFER_DEVICE_TO_HOST_ALWAYS.value()) {
-            code[codeSize - 29] = TornadoVMBytecodes.TRANSFER_DEVICE_TO_HOST_ALWAYS_BLOCKING.value();
+        int position = result.getLastCopyOutPosition();
+        if (code[position] == TornadoVMBytecodes.TRANSFER_DEVICE_TO_HOST_ALWAYS.value()) {
+            code[position] = TornadoVMBytecodes.TRANSFER_DEVICE_TO_HOST_ALWAYS_BLOCKING.value();
         } else {
             result.barrier(numDepLists);
         }
@@ -184,8 +179,8 @@ public class TornadoVMGraphCompiler {
                             try {
                                 tornadoVMBytecodeBuilder.emitAsyncNode(asyncNode, (dependencies[i].isEmpty()) ? -1 : depLists[i], offset, bufferBatchSize, nThreads);
                             } catch (BufferOverflowException e) {
-                                throw new TornadoRuntimeException("[ERROR] Buffer Overflow exception. Use -Dtornado.tvm.maxbytecodesize=<value> with value > "
-                                        + TornadoVMBytecodeBuilder.MAX_TORNADO_VM_BYTECODE_SIZE + " to increase the buffer code size");
+                                throw new TornadoRuntimeException(
+                                        STR."[ERROR] Buffer Overflow exception. Use -Dtornado.tvm.maxbytecodesize=<value> with value > \{TornadoVMBytecodeBuilder.MAX_TORNADO_VM_BYTECODE_SIZE} to increase the buffer code size");
                             }
                         }
 
@@ -210,19 +205,19 @@ public class TornadoVMGraphCompiler {
      * context based on the provided parameters.
      *
      * @param id
-     *            The index of the device in the list of devices from the execution
-     *            context.
+     *     The index of the device in the list of devices from the execution
+     *     context.
      * @param asyncNode
-     *            The asynchronous node being considered for emission.
+     *     The asynchronous node being considered for emission.
      * @param singleContext
-     *            A flag indicating if the operation is being executed in a single
-     *            context. If true, the method will always return true. If false, it
-     *            will check the context's device at the given index.
+     *     A flag indicating if the operation is being executed in a single
+     *     context. If true, the method will always return true. If false, it
+     *     will check the context's device at the given index.
      * @param executionContext
-     *            The {@link TornadoExecutionContext} containing the list of
-     *            devices.
+     *     The {@link TornadoExecutionContext} containing the list of
+     *     devices.
      * @return True if the asynchronous node should be emitted for the current
-     *         context, otherwise false.
+     *     context, otherwise false.
      */
     private static boolean shouldEmitAsyncNodeForTheCurrentContext(int id, ContextOpNode asyncNode, boolean singleContext, TornadoExecutionContext executionContext) throws IndexOutOfBoundsException {
         return singleContext || (id >= 0 && id < executionContext.getDevices().size() && asyncNode.getContext().getDevice() == executionContext.getDevices().get(id));

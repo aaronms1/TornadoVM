@@ -12,15 +12,13 @@
  *
  * This code is distributed in the hope that it will be useful, but WITHOUT
  * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
- * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License
  * version 2 for more details (a copy is included in the LICENSE file that
  * accompanied this code).
  *
  * You should have received a copy of the GNU General Public License version
  * 2 along with this work; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
- *
- * Authors: James Clarkson
  *
  */
 package uk.ac.manchester.tornado.drivers.opencl.graal.phases;
@@ -60,13 +58,14 @@ import jdk.vm.ci.meta.JavaKind;
 import jdk.vm.ci.meta.ResolvedJavaField;
 import uk.ac.manchester.tornado.api.GridScheduler;
 import uk.ac.manchester.tornado.api.exceptions.TornadoBailoutRuntimeException;
+import uk.ac.manchester.tornado.api.types.HalfFloat;
+import uk.ac.manchester.tornado.drivers.common.compiler.phases.analysis.TornadoValueTypeReplacement;
+import uk.ac.manchester.tornado.drivers.common.compiler.phases.loops.TornadoLoopUnroller;
 import uk.ac.manchester.tornado.drivers.opencl.graal.nodes.OCLKernelContextAccessNode;
 import uk.ac.manchester.tornado.runtime.common.RuntimeUtilities;
-import uk.ac.manchester.tornado.runtime.common.Tornado;
+import uk.ac.manchester.tornado.runtime.common.TornadoLogger;
 import uk.ac.manchester.tornado.runtime.graal.nodes.ParallelRangeNode;
 import uk.ac.manchester.tornado.runtime.graal.phases.TornadoHighTierContext;
-import uk.ac.manchester.tornado.runtime.graal.phases.TornadoLoopUnroller;
-import uk.ac.manchester.tornado.runtime.graal.phases.TornadoValueTypeReplacement;
 
 public class TornadoTaskSpecialisation extends BasePhase<TornadoHighTierContext> {
 
@@ -86,6 +85,17 @@ public class TornadoTaskSpecialisation extends BasePhase<TornadoHighTierContext>
         this.valueTypeReplacement = new TornadoValueTypeReplacement();
         this.deadCodeElimination = new DeadCodeEliminationPhase();
         this.loopUnroll = new TornadoLoopUnroller(canonicalizer);
+    }
+
+    private static boolean hasPanamaArraySizeNode(StructuredGraph graph) {
+        for (LoadFieldNode loadField : graph.getNodes().filter(LoadFieldNode.class)) {
+            final ResolvedJavaField field = loadField.field();
+            if (field.getType().getJavaKind().isPrimitive()) {
+                if (loadField.toString().contains("numberOfElements"))
+                    return true;
+            }
+        }
+        return false;
     }
 
     private Field lookupField(Class<?> type, String field) {
@@ -166,8 +176,7 @@ public class TornadoTaskSpecialisation extends BasePhase<TornadoHighTierContext>
                         node.usages().filter(ArrayLengthNode.class).forEach(arrayLength -> evaluate(graph, arrayLength, value));
                     }
                     break;
-                case Illegal:
-                case Void:
+                case Illegal, Void:
                 default:
                     break;
             }
@@ -185,8 +194,7 @@ public class TornadoTaskSpecialisation extends BasePhase<TornadoHighTierContext>
     }
 
     private void evaluate(final StructuredGraph graph, final Node node, final Object value) {
-        if (node instanceof ArrayLengthNode) {
-            ArrayLengthNode arrayLength = (ArrayLengthNode) node;
+        if (node instanceof ArrayLengthNode arrayLength) {
             int length = Array.getLength(value);
 
             /**
@@ -204,21 +212,24 @@ public class TornadoTaskSpecialisation extends BasePhase<TornadoHighTierContext>
                 node.replaceAtUsages(kernelContextAccessNode);
                 index++;
             } else {
-                final ConstantNode constant;
-                if (batchThreads <= 0) {
-                    constant = ConstantNode.forInt(length);
-                } else {
-                    constant = ConstantNode.forInt((int) batchThreads);
-                }
+                final ConstantNode constant = (batchThreads <= 0) ? ConstantNode.forInt(length) : ConstantNode.forInt((int) batchThreads);
                 node.replaceAtUsages(graph.addOrUnique(constant));
             }
             arrayLength.clearInputs();
             GraphUtil.removeFixedWithUnusedInputs(arrayLength);
-        } else if (node instanceof LoadFieldNode) {
-            final LoadFieldNode loadField = (LoadFieldNode) node;
+        } else if (node instanceof LoadFieldNode loadField) {
             final ResolvedJavaField field = loadField.field();
             if (field.getType().getJavaKind().isPrimitive()) {
-                ConstantNode constant = lookupPrimField(graph, node, value, field.getName(), field.getJavaKind());
+                ConstantNode constant;
+                if (node.toString().contains("numberOfElements")) {
+                    if (batchThreads <= 0) {
+                        constant = lookupPrimField(graph, node, value, field.getName(), field.getJavaKind());
+                    } else {
+                        constant = ConstantNode.forInt((int) batchThreads);
+                    }
+                } else {
+                    constant = lookupPrimField(graph, node, value, field.getName(), field.getJavaKind());
+                }
                 constant = graph.addOrUnique(constant);
                 node.replaceAtUsages(constant);
                 loadField.clearInputs();
@@ -229,8 +240,7 @@ public class TornadoTaskSpecialisation extends BasePhase<TornadoHighTierContext>
             } else if (!field.isFinal()) {
                 throw new TornadoBailoutRuntimeException("Non-final objects introduced via scope are not supported");
             }
-        } else if (node instanceof IsNullNode) {
-            final IsNullNode isNullNode = (IsNullNode) node;
+        } else if (node instanceof IsNullNode isNullNode) {
             final boolean isNull = (value == null);
             if (isNull) {
                 isNullNode.replaceAtUsages(LogicConstantNode.tautology(graph));
@@ -238,25 +248,24 @@ public class TornadoTaskSpecialisation extends BasePhase<TornadoHighTierContext>
                 isNullNode.replaceAtUsages(LogicConstantNode.contradiction(graph));
             }
             isNullNode.safeDelete();
-        } else if (node instanceof PiNode) {
-            PiNode piNode = (PiNode) node;
+        } else if (node instanceof PiNode piNode) {
             piNode.replaceAtUsages(piNode.getOriginalNode());
             piNode.safeDelete();
         }
     }
 
-    private ConstantNode createConstantFromObject(Object obj) {
+    private ConstantNode createConstantFromObject(Object obj, StructuredGraph graph) {
         ConstantNode result = null;
-        if (obj instanceof Float) {
-            result = ConstantNode.forFloat((float) obj);
-        } else if (obj instanceof Integer) {
-            result = ConstantNode.forInt((int) obj);
-        } else if (obj instanceof Double) {
-            result = ConstantNode.forDouble((double) obj);
-        } else if (obj instanceof Long) {
-            result = ConstantNode.forLong((long) obj);
-        } else {
-            unimplemented("createConstantFromObject: %s", obj);
+        switch (obj) {
+            case Byte objByte -> result = ConstantNode.forByte(objByte, graph);
+            case Character objChar -> result = ConstantNode.forChar(objChar, graph);
+            case Short objShort -> result = ConstantNode.forShort(objShort, graph);
+            case HalfFloat objHalfFloat -> result = ConstantNode.forFloat(objHalfFloat.getFloat32(), graph);
+            case Integer objInteger -> result = ConstantNode.forInt(objInteger, graph);
+            case Float objFloat -> result = ConstantNode.forFloat(objFloat, graph);
+            case Double objDouble -> result = ConstantNode.forDouble(objDouble, graph);
+            case Long objLong -> result = ConstantNode.forLong(objLong, graph);
+            case null, default -> unimplemented("createConstantFromObject: %s", obj);
         }
         return result;
     }
@@ -288,8 +297,7 @@ public class TornadoTaskSpecialisation extends BasePhase<TornadoHighTierContext>
                 parameterNode.replaceAtUsages(kernelContextAccessNode);
                 index++;
             } else {
-                ConstantNode constant = createConstantFromObject(args[parameterNode.index()]);
-                graph.addWithoutUnique(constant);
+                ConstantNode constant = createConstantFromObject(args[parameterNode.index()], graph);
                 parameterNode.replaceAtUsages(constant);
             }
         } else {
@@ -304,7 +312,7 @@ public class TornadoTaskSpecialisation extends BasePhase<TornadoHighTierContext>
         int iterations = 0;
         int lastNodeCount = graph.getNodeCount();
         boolean hasWork = true;
-        this.batchThreads = context.getBatchThreads();
+        this.batchThreads = context.getBatchCompilationConfig().getBatchThreads();
         this.gridScheduling = context.isGridSchedulerEnabled();
 
         while (hasWork) {
@@ -337,16 +345,15 @@ public class TornadoTaskSpecialisation extends BasePhase<TornadoHighTierContext>
 
             deadCodeElimination.run(graph);
 
-            getDebugContext().dump(DebugContext.INFO_LEVEL, graph, "After TaskSpecialisation iteration = " + iterations);
+            getDebugContext().dump(DebugContext.INFO_LEVEL, graph, STR."After TaskSpecialisation iteration = \{iterations}");
 
-            hasWork = (lastNodeCount != graph.getNodeCount() || graph.getNewNodes(mark).isNotEmpty()) && (iterations < MAX_ITERATIONS);
+            hasWork = (lastNodeCount != graph.getNodeCount() || graph.getNewNodes(mark).isNotEmpty() || hasPanamaArraySizeNode(graph)) && (iterations < MAX_ITERATIONS);
             lastNodeCount = graph.getNodeCount();
             iterations++;
         }
 
         graph.getNodes().filter(ParallelRangeNode.class).forEach(range -> {
-            if (range.value() instanceof PhiNode) {
-                PhiNode phiNode = (PhiNode) range.value();
+            if (range.value() instanceof PhiNode phiNode) {
                 NodeIterable<Node> usages = range.usages();
                 for (Node usage : usages) {
                     if (usage instanceof IntegerLessThanNode) {
@@ -376,11 +383,13 @@ public class TornadoTaskSpecialisation extends BasePhase<TornadoHighTierContext>
             }
         });
 
+        TornadoLogger logger = new TornadoLogger(this.getClass());
+
         if (iterations == MAX_ITERATIONS) {
-            Tornado.warn("TaskSpecialisation unable to complete after %d iterations", iterations);
+            logger.warn("TaskSpecialisation unable to complete after %d iterations", iterations);
         }
-        Tornado.debug("TaskSpecialisation ran %d iterations", iterations);
-        Tornado.debug("valid graph? %s", graph.verify());
+        logger.debug("TaskSpecialisation ran %d iterations", iterations);
+        logger.debug("valid graph? %s", graph.verify());
         index = 0;
     }
 

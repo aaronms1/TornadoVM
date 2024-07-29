@@ -1,5 +1,5 @@
 /*
- * This file is part of Tornado: A heterogeneous programming framework: 
+ * This file is part of Tornado: A heterogeneous programming framework:
  * https://github.com/beehive-lab/tornadovm
  *
  * Copyright (c) 2013-2020, APT Group, Department of Computer Science,
@@ -12,7 +12,7 @@
  *
  * This code is distributed in the hope that it will be useful, but WITHOUT
  * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
- * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License
  * version 2 for more details (a copy is included in the LICENSE file that
  * accompanied this code).
  *
@@ -20,41 +20,34 @@
  * 2 along with this work; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
  *
- * Authors: James Clarkson
- *
  */
 package uk.ac.manchester.tornado.drivers.opencl.enums;
 
 public enum OCLBuildStatus {
-    CL_BUILD_SUCCESS(0), CL_BUILD_NONE(-1), CL_BUILD_ERROR(-2), CL_BUILD_IN_PROGRESS(-3), CL_BUILD_UNKNOWN(-4);
+    CL_BUILD_SUCCESS(0), //
+    CL_BUILD_NONE(-1), //
+    CL_BUILD_ERROR(-2), //
+    CL_BUILD_IN_PROGRESS(-3), //
+    CL_BUILD_UNKNOWN(-4);
 
-    private final int value;
+    private final int buildStatusCode;
 
     OCLBuildStatus(final int v) {
-        value = v;
+        buildStatusCode = v;
     }
 
-    public int getValue() {
-        return value;
+    public int getBuildStatusCode() {
+        return buildStatusCode;
     }
 
-    public static OCLBuildStatus toEnum(final int v) {
-        OCLBuildStatus result = OCLBuildStatus.CL_BUILD_UNKNOWN;
-        switch (v) {
-            case 0:
-                result = OCLBuildStatus.CL_BUILD_SUCCESS;
-                break;
-            case -1:
-                result = OCLBuildStatus.CL_BUILD_NONE;
-                break;
-            case -2:
-                result = OCLBuildStatus.CL_BUILD_ERROR;
-                break;
-            case -3:
-                result = OCLBuildStatus.CL_BUILD_IN_PROGRESS;
-                break;
-        }
-        return result;
+    public static OCLBuildStatus toEnum(final int errorCode) {
+        return switch (errorCode) {
+            case 0 -> OCLBuildStatus.CL_BUILD_SUCCESS;
+            case -1 -> OCLBuildStatus.CL_BUILD_NONE;
+            case -2 -> OCLBuildStatus.CL_BUILD_ERROR;
+            case -3 -> OCLBuildStatus.CL_BUILD_IN_PROGRESS;
+            default -> null;
+        };
     }
 
 }

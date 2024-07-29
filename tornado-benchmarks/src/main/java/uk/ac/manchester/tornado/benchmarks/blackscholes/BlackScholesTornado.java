@@ -1,12 +1,12 @@
 /*
- * Copyright (c) 2013-2020, 2022, APT Group, Department of Computer Science,
+ * Copyright (c) 2013-2023, APT Group, Department of Computer Science,
  * The University of Manchester.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *    http://www.apache.org/licenses/LICENSE-2.0
+ * http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -17,13 +17,17 @@
  */
 package uk.ac.manchester.tornado.benchmarks.blackscholes;
 
-import static uk.ac.manchester.tornado.api.collections.math.TornadoMath.abs;
+import static uk.ac.manchester.tornado.api.math.TornadoMath.abs;
 import static uk.ac.manchester.tornado.benchmarks.ComputeKernels.blackscholes;
 
+import uk.ac.manchester.tornado.api.ImmutableTaskGraph;
 import uk.ac.manchester.tornado.api.TaskGraph;
 import uk.ac.manchester.tornado.api.TornadoExecutionPlan;
 import uk.ac.manchester.tornado.api.common.TornadoDevice;
 import uk.ac.manchester.tornado.api.enums.DataTransferMode;
+import uk.ac.manchester.tornado.api.exceptions.TornadoExecutionPlanException;
+import uk.ac.manchester.tornado.api.exceptions.TornadoRuntimeException;
+import uk.ac.manchester.tornado.api.types.arrays.FloatArray;
 import uk.ac.manchester.tornado.benchmarks.BenchmarkDriver;
 import uk.ac.manchester.tornado.benchmarks.ComputeKernels;
 
@@ -32,15 +36,15 @@ import uk.ac.manchester.tornado.benchmarks.ComputeKernels;
  * How to run?
  * </p>
  * <code>
- *     tornado -m tornado.benchmarks/uk.ac.manchester.tornado.benchmarks.BenchmarkRunner blackscholes
+ * tornado -m tornado.benchmarks/uk.ac.manchester.tornado.benchmarks.BenchmarkRunner blackscholes
  * </code>
  */
 public class BlackScholesTornado extends BenchmarkDriver {
 
     private final int size;
-    private float[] randArray;
-    private float[] call;
-    private float[] put;
+    private FloatArray randArray;
+    private FloatArray call;
+    private FloatArray put;
 
     public BlackScholesTornado(int iterations, int size) {
         super(iterations);
@@ -49,70 +53,80 @@ public class BlackScholesTornado extends BenchmarkDriver {
 
     @Override
     public void setUp() {
-        randArray = new float[size];
-        call = new float[size];
-        put = new float[size];
+        randArray = new FloatArray(size);
+        call = new FloatArray(size);
+        put = new FloatArray(size);
 
         for (int i = 0; i < size; i++) {
-            randArray[i] = (i * 1.0f) / size;
+            randArray.set(i, (i * 1.0f) / size);
         }
 
         taskGraph = new TaskGraph("benchmark") //
                 .transferToDevice(DataTransferMode.EVERY_EXECUTION, randArray) //
                 .task("t0", ComputeKernels::blackscholes, randArray, put, call) //
                 .transferToHost(DataTransferMode.EVERY_EXECUTION, put, call);
-
         immutableTaskGraph = taskGraph.snapshot();
         executionPlan = new TornadoExecutionPlan(immutableTaskGraph);
-        executionPlan.withWarmUp();
     }
 
     @Override
     public void tearDown() {
-        executionResult.getProfilerResult().dumpProfiles();
+        if (executionResult != null) {
+            executionResult.getProfilerResult().dumpProfiles();
+        }
         randArray = null;
         call = null;
         put = null;
-        executionPlan.resetDevice();
+        if (executionPlan != null) {
+            executionPlan.resetDevice();
+        }
         super.tearDown();
     }
 
     @Override
     public boolean validate(TornadoDevice device) {
-        float[] randArrayTor,callTor,putTor,calSeq,putSeq;
+        FloatArray randArraySeq;
+        FloatArray callTor;
+        FloatArray putTor;
+        FloatArray callSeq;
+        FloatArray putSeq;
         boolean val;
 
         val = true;
 
-        randArrayTor = new float[size];
-        callTor = new float[size];
-        putTor = new float[size];
-        calSeq = new float[size];
-        putSeq = new float[size];
+        randArraySeq = new FloatArray(size);
+        callTor = new FloatArray(size);
+        putTor = new FloatArray(size);
+        callSeq = new FloatArray(size);
+        putSeq = new FloatArray(size);
 
         for (int i = 0; i < size; i++) {
-            randArrayTor[i] = (float) Math.random();
+            randArraySeq.set(i, randArray.get(i));
         }
 
-        taskGraph = new TaskGraph("benchmark");
-        taskGraph.transferToDevice(DataTransferMode.EVERY_EXECUTION, randArrayTor);
-        taskGraph.task("t0", ComputeKernels::blackscholes, randArrayTor, putTor, callTor);
+        TaskGraph taskGraph = new TaskGraph("benchmark") //
+                .transferToDevice(DataTransferMode.EVERY_EXECUTION, randArraySeq) //
+                .task("t0", ComputeKernels::blackscholes, randArraySeq, putTor, callTor) //
+                .transferToHost(DataTransferMode.EVERY_EXECUTION, putTor, callTor);
 
-        immutableTaskGraph = taskGraph.snapshot();
-        executionPlan = new TornadoExecutionPlan(immutableTaskGraph);
-        executionResult = executionPlan.withWarmUp().execute();
+        ImmutableTaskGraph immutableTaskGraph = taskGraph.snapshot();
+        try (TornadoExecutionPlan executionPlan = new TornadoExecutionPlan(immutableTaskGraph)) {
+            executionPlan.withDevice(device).execute();
+        } catch (TornadoExecutionPlanException e) {
+            e.printStackTrace();
+            throw new TornadoRuntimeException(e);
+        }
 
-        executionResult.transferToHost(putTor, callTor);
-        executionPlan.clearProfiles();
-
-        blackscholes(randArrayTor, putSeq, calSeq);
+        blackscholes(randArraySeq, putSeq, callSeq);
 
         for (int i = 0; i < size; i++) {
-            if (abs(putTor[i] - putSeq[i]) > 0.01) {
+            if (abs(putTor.get(i) - putSeq.get(i)) > 0.01) {
+                System.out.printf("Number validation: " + putTor.get(i) + " vs " + putSeq.get(i) + "\n");
                 val = false;
                 break;
             }
-            if (abs(callTor[i] - calSeq[i]) > 0.01) {
+            if (abs(callTor.get(i) - callSeq.get(i)) > 0.01) {
+                System.out.printf("Number validation: " + callTor.get(i) + " vs " + callSeq.get(i) + "\n");
                 val = false;
                 break;
             }
@@ -122,7 +136,7 @@ public class BlackScholesTornado extends BenchmarkDriver {
     }
 
     @Override
-    public void benchmarkMethod(TornadoDevice device) {
+    public void runBenchmark(TornadoDevice device) {
         executionResult = executionPlan.withDevice(device) //
                 .execute();
     }

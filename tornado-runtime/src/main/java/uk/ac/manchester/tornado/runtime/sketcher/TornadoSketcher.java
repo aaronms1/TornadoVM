@@ -1,28 +1,28 @@
 /*
-* This file is part of Tornado: A heterogeneous programming framework:
-* https://github.com/beehive-lab/tornadovm
-*
-* Copyright (c) 2020, 2023 APT Group, Department of Computer Science,
-* School of Engineering, The University of Manchester. All rights reserved.
-* Copyright (c) 2013-2020, APT Group, Department of Computer Science,
-* The University of Manchester. All rights reserved.
-* DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
-*
-* This code is free software; you can redistribute it and/or modify it
-* under the terms of the GNU General Public License version 2 only, as
-* published by the Free Software Foundation.
-*
-* This code is distributed in the hope that it will be useful, but WITHOUT
-* ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-* FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
-* version 2 for more details (a copy is included in the LICENSE file that
-* accompanied this code).
-*
-* You should have received a copy of the GNU General Public License version
-* 2 along with this work; if not, write to the Free Software Foundation,
-* Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
-*
-*/
+ * This file is part of Tornado: A heterogeneous programming framework:
+ * https://github.com/beehive-lab/tornadovm
+ *
+ * Copyright (c) 2020, 2023, 2024, APT Group, Department of Computer Science,
+ * School of Engineering, The University of Manchester. All rights reserved.
+ * Copyright (c) 2013-2020, APT Group, Department of Computer Science,
+ * The University of Manchester. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ *
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ */
 package uk.ac.manchester.tornado.runtime.sketcher;
 
 import static org.graalvm.compiler.phases.common.DeadCodeEliminationPhase.Optionality.Optional;
@@ -30,8 +30,6 @@ import static uk.ac.manchester.tornado.api.exceptions.TornadoInternalError.guara
 import static uk.ac.manchester.tornado.runtime.TornadoCoreRuntime.getDebugContext;
 import static uk.ac.manchester.tornado.runtime.TornadoCoreRuntime.getOptions;
 import static uk.ac.manchester.tornado.runtime.TornadoCoreRuntime.getTornadoExecutor;
-import static uk.ac.manchester.tornado.runtime.common.Tornado.fatal;
-import static uk.ac.manchester.tornado.runtime.common.Tornado.info;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -67,7 +65,8 @@ import uk.ac.manchester.tornado.api.exceptions.TornadoInternalError;
 import uk.ac.manchester.tornado.api.exceptions.TornadoRuntimeException;
 import uk.ac.manchester.tornado.runtime.TornadoCoreRuntime;
 import uk.ac.manchester.tornado.runtime.common.OCLTokens;
-import uk.ac.manchester.tornado.runtime.common.Tornado;
+import uk.ac.manchester.tornado.runtime.common.TornadoLogger;
+import uk.ac.manchester.tornado.runtime.common.TornadoOptions;
 import uk.ac.manchester.tornado.runtime.graal.compiler.TornadoCompilerIdentifier;
 import uk.ac.manchester.tornado.runtime.graal.compiler.TornadoSketchTier;
 import uk.ac.manchester.tornado.runtime.graal.phases.TornadoSketchTierContext;
@@ -78,6 +77,7 @@ public class TornadoSketcher {
     private static final Map<ResolvedJavaMethod, List<TornadoSketcherCacheEntry>> cache = new ConcurrentHashMap<>();
     private static final TimerKey Sketcher = DebugContext.timer("Sketcher");
     private static final OptimisticOptimizations optimisticOpts = OptimisticOptimizations.ALL;
+    private static TornadoLogger logger = new TornadoLogger();
 
     private static boolean cacheContainsSketch(ResolvedJavaMethod method, int driverIndex, int deviceIndex) {
         List<TornadoSketcherCacheEntry> entries = cache.get(method);
@@ -110,16 +110,16 @@ public class TornadoSketcher {
             }
             guarantee(sketch != null, "No sketch available for %d:%d %s", driverIndex, deviceIndex, resolvedMethod.getName());
         } catch (InterruptedException | ExecutionException e) {
-            fatal("Failed to retrieve sketch for %d:%d %s ", driverIndex, deviceIndex, resolvedMethod.getName());
-            if (Tornado.DEBUG) {
+            logger.fatal("Failed to retrieve sketch for %d:%d %s ", driverIndex, deviceIndex, resolvedMethod.getName());
+            if (TornadoOptions.DEBUG) {
                 e.printStackTrace();
             }
             final Throwable cause = e.getCause();
-            if (cause instanceof TornadoRuntimeException) {
-                throw (TornadoRuntimeException) cause;
+            if (cause instanceof TornadoRuntimeException runtimeException) {
+                throw runtimeException;
             }
-            if (cause instanceof TornadoBailoutRuntimeException) {
-                throw (TornadoBailoutRuntimeException) cause;
+            if (cause instanceof TornadoBailoutRuntimeException bailoutRuntimeException) {
+                throw bailoutRuntimeException;
             }
             throw new TornadoInternalError(cause);
         }
@@ -135,23 +135,23 @@ public class TornadoSketcher {
         sketches.add(new TornadoSketcherCacheEntry(request.driverIndex, request.deviceIndex, result));
     }
 
-    private static Sketch buildSketch(ResolvedJavaMethod resolvedMethod, Providers providers, PhaseSuite<HighTierContext> graphBuilderSuite, TornadoSketchTier sketchTier, int driverIndex,
+    private static Sketch buildSketch(ResolvedJavaMethod resolvedMethod, Providers providers, PhaseSuite<HighTierContext> graphBuilderSuite, TornadoSketchTier sketchTier, int backendIndex,
             int deviceIndex) {
-        info("Building sketch of %s", resolvedMethod.getName());
+        logger.info("Building sketch of %s", resolvedMethod.getName());
         TornadoCompilerIdentifier id = new TornadoCompilerIdentifier("sketch-" + resolvedMethod.getName(), sketchId.getAndIncrement());
         Builder builder = new Builder(getOptions(), getDebugContext(), AllowAssumptions.YES);
         builder.method(resolvedMethod);
         builder.compilationId(id);
-        builder.name("sketch-" + resolvedMethod.getName());
+        builder.name(STR."sketch-\{resolvedMethod.getName()}");
         final StructuredGraph graph = builder.build();
 
         // Check legal Kernel Name
         if (OCLTokens.openCLTokens.contains(resolvedMethod.getName())) {
-            throw new TornadoRuntimeException("[ERROR] Java method name corresponds to an OpenCL Token. Change the Java method's name: " + resolvedMethod.getName());
+            throw new TornadoRuntimeException(STR."[ERROR] Java method name corresponds to an OpenCL Token. Change the Java method's name: \{resolvedMethod.getName()}");
         }
 
         try (DebugContext.Scope ignored = getDebugContext().scope("Tornado-Sketcher", new DebugDumpScope("Tornado-Sketcher")); DebugCloseable ignored1 = Sketcher.start(getDebugContext())) {
-            final TornadoSketchTierContext highTierContext = new TornadoSketchTierContext(providers, graphBuilderSuite, optimisticOpts, resolvedMethod);
+            final TornadoSketchTierContext highTierContext = new TornadoSketchTierContext(providers, graphBuilderSuite, optimisticOpts, resolvedMethod, backendIndex, deviceIndex);
             if (graph.start().next() == null) {
                 graphBuilderSuite.apply(graph, highTierContext);
                 new DeadCodeEliminationPhase(Optional).apply(graph);
@@ -167,27 +167,27 @@ public class TornadoSketcher {
                     .forEach(invoke -> { //
                         if (OCLTokens.openCLTokens.contains(invoke.callTarget().targetMethod().getName())) {
                             throw new TornadoRuntimeException(
-                                    "[ERROR] Java method name corresponds to an OpenCL Token. Change the Java method's name: " + invoke.callTarget().targetMethod().getName());
+                                    STR."[ERROR] Java method name corresponds to an OpenCL Token. Change the Java method's name: \{invoke.callTarget().targetMethod().getName()}");
                         }
-                        SketchRequest newRequest = new SketchRequest(invoke.callTarget().targetMethod(), providers, graphBuilderSuite, sketchTier, driverIndex, deviceIndex);
+                        SketchRequest newRequest = new SketchRequest(invoke.callTarget().targetMethod(), providers, graphBuilderSuite, sketchTier, backendIndex, deviceIndex);
                         buildSketch(newRequest);
                     });
 
             Access[] methodAccesses = highTierContext.getAccesses();
             graph.getInvokes().forEach(invoke -> {
                 // Merge the accesses of the caller with the accesses of the callee
-                Sketch sketch = lookup(invoke.callTarget().targetMethod(), driverIndex, deviceIndex);
+                Sketch sketch = lookup(invoke.callTarget().targetMethod(), backendIndex, deviceIndex);
                 mergeAccesses(methodAccesses, invoke.callTarget(), sketch.getArgumentsAccess());
             });
 
-            return new Sketch(graph.copy(TornadoCoreRuntime.getDebugContext()), methodAccesses);
+            return new Sketch(graph.copy(TornadoCoreRuntime.getDebugContext()), methodAccesses, highTierContext.getBatchWriteThreadIndex());
 
         } catch (Throwable e) {
-            fatal("unable to build sketch for method: %s (%s)", resolvedMethod.getName(), e.getMessage());
-            if (Tornado.DEBUG) {
+            logger.fatal("unable to build sketch for method: %s (%s)", resolvedMethod.getName(), e.getMessage());
+            if (TornadoOptions.DEBUG) {
                 e.printStackTrace();
             }
-            throw new TornadoBailoutRuntimeException("Unable to build sketch for method: " + resolvedMethod.getName() + "(" + e.getMessage() + ")");
+            throw new TornadoBailoutRuntimeException(STR."Unable to build sketch for method: \{resolvedMethod.getName()}(\{e.getMessage()})");
         }
     }
 
@@ -216,10 +216,9 @@ public class TornadoSketcher {
 
         for (; index < callArgs.size(); index++) {
             ValueNode callArg = callArgs.get(index);
-            if (!(callArg instanceof ParameterNode)) {
+            if (!(callArg instanceof ParameterNode param)) {
                 continue;
             }
-            ParameterNode param = (ParameterNode) callArg;
             int paramIndex = param.index();
 
             Access calleeAcc = calleeAccesses[index];
@@ -229,7 +228,7 @@ public class TornadoSketcher {
         }
     }
 
-    private static class TornadoSketcherCacheEntry {
+    private static final class TornadoSketcherCacheEntry {
 
         private final int driverIndex;
         private final int deviceIndex;
@@ -253,7 +252,7 @@ public class TornadoSketcher {
     private static class TornadoSketcherCallable implements Callable<Sketch> {
         private final SketchRequest request;
 
-        public TornadoSketcherCallable(SketchRequest request) {
+        TornadoSketcherCallable(SketchRequest request) {
             this.request = request;
         }
 

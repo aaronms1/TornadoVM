@@ -12,7 +12,7 @@
  *
  * This code is distributed in the hope that it will be useful, but WITHOUT
  * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
- * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License
  * version 2 for more details (a copy is included in the LICENSE file that
  * accompanied this code).
  *
@@ -25,9 +25,6 @@ package uk.ac.manchester.tornado.drivers.opencl;
 
 import static uk.ac.manchester.tornado.api.exceptions.TornadoInternalError.guarantee;
 import static uk.ac.manchester.tornado.drivers.opencl.enums.OCLCommandQueueProperties.CL_QUEUE_OUT_OF_ORDER_EXEC_MODE_ENABLE;
-import static uk.ac.manchester.tornado.runtime.common.Tornado.MAX_WAIT_EVENTS;
-import static uk.ac.manchester.tornado.runtime.common.Tornado.debug;
-import static uk.ac.manchester.tornado.runtime.common.Tornado.fatal;
 import static uk.ac.manchester.tornado.runtime.common.TornadoOptions.CIRCULAR_EVENTS;
 
 import java.util.ArrayList;
@@ -35,29 +32,36 @@ import java.util.Arrays;
 import java.util.BitSet;
 import java.util.List;
 
-import uk.ac.manchester.tornado.drivers.common.EventDescriptor;
+import uk.ac.manchester.tornado.drivers.common.utils.EventDescriptor;
+import uk.ac.manchester.tornado.runtime.common.TornadoLogger;
+import uk.ac.manchester.tornado.runtime.common.TornadoOptions;
 
 /**
- * Class which holds mapping between OpenCL events and TornadoVM local events
- * and handles event registration and serialization. Also contains extra
- * information such as events description and tag.
- * 
+ * Class which holds mapping between OpenCL events and TornadoVM runtime events,
+ * and handles event registration and serialization. It also keeps metadata such
+ * as events description and tag.
+ *
+ * <p>
  * Each device holds an event pool. Only one instance of the pool per device.
+ * </p>
+ *
+ * <p>
+ * Relationship: one instance of the {@link OCLEventPool} per {@link OCLDeviceContext}.
+ * </p>
  */
-class OCLEventPool {
+public class OCLEventPool {
 
+    public final long[] waitEventsBuffer;
     private final long[] events;
     private final EventDescriptor[] descriptors;
     private final BitSet retain;
     private final OCLCommandQueue[] eventQueues;
-    private int eventIndex;
-
     private final OCLEvent internalEvent;
-    protected final long[] waitEventsBuffer;
-
+    private int eventIndex;
     private int eventPoolSize;
+    private final TornadoLogger logger;
 
-    protected OCLEventPool(int poolSize) {
+    public OCLEventPool(int poolSize) {
         this.eventPoolSize = poolSize;
         this.retain = new BitSet(eventPoolSize);
         this.retain.clear();
@@ -65,11 +69,12 @@ class OCLEventPool {
         this.descriptors = new EventDescriptor[eventPoolSize];
         this.eventQueues = new OCLCommandQueue[eventPoolSize];
         this.eventIndex = 0;
-        this.waitEventsBuffer = new long[MAX_WAIT_EVENTS];
+        this.waitEventsBuffer = new long[TornadoOptions.MAX_WAIT_EVENTS];
         this.internalEvent = new OCLEvent();
+        this.logger = new TornadoLogger(this.getClass());
     }
 
-    protected int registerEvent(long oclEventId, EventDescriptor descriptorId, OCLCommandQueue queue) {
+    public int registerEvent(long oclEventId, EventDescriptor descriptorId, OCLCommandQueue queue) {
         if (retain.get(eventIndex)) {
             findNextEventSlot();
         }
@@ -82,8 +87,8 @@ class OCLEventPool {
          * exit.
          */
         if (oclEventId == -1) {
-            fatal("invalid event: event=0x%x, description=%s, tag=0x%x\n", oclEventId, descriptorId.getNameDescription());
-            fatal("terminating application as system integrity has been compromised.");
+            logger.fatal("invalid event: event=0x%x, description=%s, tag=0x%x\n", oclEventId, descriptorId.getNameDescription());
+            logger.fatal("terminating application as system integrity has been compromised.");
             System.exit(-1);
         }
 
@@ -110,7 +115,7 @@ class OCLEventPool {
         guarantee(eventIndex != -1, "event window is full (retained=%d, capacity=%d)", retain.cardinality(), eventPoolSize);
     }
 
-    protected boolean serialiseEvents(int[] dependencies, OCLCommandQueue queue) {
+    public boolean serialiseEvents(int[] dependencies, OCLCommandQueue queue) {
         boolean outOfOrderQueue = (queue.getProperties() & CL_QUEUE_OUT_OF_ORDER_EXEC_MODE_ENABLE) == 1;
         if (dependencies == null || dependencies.length == 0 || !outOfOrderQueue) {
             return false;
@@ -123,7 +128,7 @@ class OCLEventPool {
             if (value != -1) {
                 index++;
                 waitEventsBuffer[index] = events[value];
-                debug("[%d] 0x%x - %s\n", index, events[value], descriptors[value].getNameDescription());
+                logger.debug("[%d] 0x%x - %s\n", index, events[value], descriptors[value].getNameDescription());
 
             }
         }
@@ -163,11 +168,11 @@ class OCLEventPool {
         retain.clear(localEventID);
     }
 
-    protected long getOCLEvent(int localEventID) {
+    public long getOCLEvent(int localEventID) {
         return events[localEventID];
     }
 
-    protected EventDescriptor getDescriptor(int localEventID) {
+    public EventDescriptor getDescriptor(int localEventID) {
         return descriptors[localEventID];
     }
 

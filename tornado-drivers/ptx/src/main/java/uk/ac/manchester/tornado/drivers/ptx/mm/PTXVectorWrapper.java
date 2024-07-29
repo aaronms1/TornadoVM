@@ -2,7 +2,7 @@
  * This file is part of Tornado: A heterogeneous programming framework:
  * https://github.com/beehive-lab/tornadovm
  *
- * Copyright (c) 2022, APT Group, Department of Computer Science,
+ * Copyright (c) 2022,2024 APT Group, Department of Computer Science,
  * School of Engineering, The University of Manchester. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
@@ -12,7 +12,7 @@
  *
  * This code is distributed in the hope that it will be useful, but WITHOUT
  * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
- * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License
  * version 2 for more details (a copy is included in the LICENSE file that
  * accompanied this code).
  *
@@ -25,40 +25,45 @@ package uk.ac.manchester.tornado.drivers.ptx.mm;
 
 import static uk.ac.manchester.tornado.runtime.TornadoCoreRuntime.getVMConfig;
 import static uk.ac.manchester.tornado.runtime.common.RuntimeUtilities.humanReadableByteCount;
-import static uk.ac.manchester.tornado.runtime.common.Tornado.info;
-import static uk.ac.manchester.tornado.runtime.common.Tornado.warn;
 
 import java.lang.reflect.Array;
 import java.util.ArrayList;
 import java.util.List;
 
 import jdk.vm.ci.meta.JavaKind;
-import uk.ac.manchester.tornado.api.collections.types.PrimitiveStorage;
 import uk.ac.manchester.tornado.api.exceptions.TornadoInternalError;
 import uk.ac.manchester.tornado.api.exceptions.TornadoMemoryException;
 import uk.ac.manchester.tornado.api.exceptions.TornadoRuntimeException;
-import uk.ac.manchester.tornado.api.memory.ObjectBuffer;
-import uk.ac.manchester.tornado.api.type.annotations.Payload;
+import uk.ac.manchester.tornado.api.internal.annotations.Payload;
+import uk.ac.manchester.tornado.api.memory.XPUBuffer;
+import uk.ac.manchester.tornado.api.types.HalfFloat;
+import uk.ac.manchester.tornado.api.types.arrays.ByteArray;
+import uk.ac.manchester.tornado.api.types.arrays.CharArray;
+import uk.ac.manchester.tornado.api.types.arrays.DoubleArray;
+import uk.ac.manchester.tornado.api.types.arrays.FloatArray;
+import uk.ac.manchester.tornado.api.types.arrays.HalfFloatArray;
+import uk.ac.manchester.tornado.api.types.arrays.IntArray;
+import uk.ac.manchester.tornado.api.types.arrays.LongArray;
+import uk.ac.manchester.tornado.api.types.arrays.ShortArray;
+import uk.ac.manchester.tornado.api.types.arrays.TornadoNativeArray;
+import uk.ac.manchester.tornado.api.types.common.PrimitiveStorage;
 import uk.ac.manchester.tornado.drivers.ptx.PTXDeviceContext;
-import uk.ac.manchester.tornado.runtime.common.Tornado;
+import uk.ac.manchester.tornado.runtime.common.TornadoLogger;
+import uk.ac.manchester.tornado.runtime.common.TornadoOptions;
 import uk.ac.manchester.tornado.runtime.utils.TornadoUtils;
 
-public class PTXVectorWrapper implements ObjectBuffer {
+public class PTXVectorWrapper implements XPUBuffer {
 
     private static final int INIT_VALUE = -1;
-
+    protected final PTXDeviceContext deviceContext;
     private final int arrayHeaderSize;
     private final int arrayLengthOffset;
-
+    private final long batchSize;
+    private final JavaKind kind;
     private long buffer;
     private long bufferSize;
-
-    protected final PTXDeviceContext deviceContext;
-
-    private final long batchSize;
-
-    private final JavaKind kind;
     private long setSubRegionSize;
+    private final TornadoLogger logger;
 
     public PTXVectorWrapper(final PTXDeviceContext device, final Object object, long batchSize) {
         TornadoInternalError.guarantee(object instanceof PrimitiveStorage, "Expecting a PrimitiveStorage type");
@@ -70,6 +75,7 @@ public class PTXVectorWrapper implements ObjectBuffer {
         this.bufferSize = sizeOf(payload);
         this.arrayLengthOffset = getVMConfig().arrayOopDescLengthOffset();
         this.arrayHeaderSize = getVMConfig().getArrayBaseOffset(kind);
+        this.logger = new TornadoLogger(this.getClass());
     }
 
     public long getBatchSize() {
@@ -87,30 +93,35 @@ public class PTXVectorWrapper implements ObjectBuffer {
         }
 
         if (bufferSize <= 0) {
-            throw new TornadoMemoryException("[ERROR] Bytes Allocated <= 0: " + bufferSize);
+            throw new TornadoMemoryException(STR."[ERROR] Bytes Allocated <= 0: \{bufferSize}");
         }
 
-        this.buffer = deviceContext.getBufferProvider().getBufferWithSize(bufferSize);
+        this.buffer = deviceContext.getBufferProvider().getOrAllocateBufferWithSize(bufferSize);
 
-        if (Tornado.FULL_DEBUG) {
-            info("allocated: array kind=%s, size=%s, length offset=%d, header size=%d", kind.getJavaName(), humanReadableByteCount(bufferSize, true), arrayLengthOffset, arrayHeaderSize);
-            info("allocated: %s", toString());
+        if (TornadoOptions.FULL_DEBUG) {
+            logger.info("allocated: array kind=%s, size=%s, length offset=%d, header size=%d", kind.getJavaName(), humanReadableByteCount(bufferSize, true), arrayLengthOffset, arrayHeaderSize);
+            logger.info("allocated: %s", toString());
         }
 
     }
 
     @Override
-    public void deallocate() {
+    public void markAsFreeBuffer() {
         TornadoInternalError.guarantee(buffer != INIT_VALUE, "Fatal error: trying to deallocate an invalid buffer");
 
-        deviceContext.getBufferProvider().markBufferReleased(buffer, bufferSize);
+        deviceContext.getBufferProvider().markBufferReleased(buffer);
         buffer = INIT_VALUE;
         bufferSize = INIT_VALUE;
 
-        if (Tornado.FULL_DEBUG) {
-            info("deallocated: array kind=%s, size=%s, length offset=%d, header size=%d", kind.getJavaName(), humanReadableByteCount(bufferSize, true), arrayLengthOffset, arrayHeaderSize);
-            info("deallocated: %s", toString());
+        if (TornadoOptions.FULL_DEBUG) {
+            logger.info("deallocated: array kind=%s, size=%s, length offset=%d, header size=%d", kind.getJavaName(), humanReadableByteCount(bufferSize, true), arrayLengthOffset, arrayHeaderSize);
+            logger.info("deallocated: %s", toString());
         }
+    }
+
+    @Override
+    public long deallocate() {
+        return deviceContext.getBufferProvider().deallocate();
     }
 
     @Override
@@ -119,13 +130,18 @@ public class PTXVectorWrapper implements ObjectBuffer {
     }
 
     @Override
-    public int enqueueRead(final Object value, long hostOffset, final int[] events, boolean useDeps) {
+    public void setSizeSubRegion(long batchSize) {
+        this.setSubRegionSize = batchSize;
+    }
+
+    @Override
+    public int enqueueRead(long executionPlanId, final Object value, long hostOffset, final int[] events, boolean useDeps) {
         TornadoInternalError.guarantee(value instanceof PrimitiveStorage, "Expecting a PrimitiveStorage type");
         final Object actualValue = TornadoUtils.getAnnotatedObjectFromField(value, Payload.class);
         if (actualValue == null) {
             throw new TornadoRuntimeException("[ERROR] output data is NULL");
         }
-        final int returnEvent = enqueueReadArrayData(toBuffer(), bufferSize, actualValue, hostOffset, (useDeps) ? events : null);
+        final int returnEvent = enqueueReadArrayData(executionPlanId, toBuffer(), bufferSize, actualValue, hostOffset, (useDeps) ? events : null);
         return useDeps ? returnEvent : -1;
     }
 
@@ -133,36 +149,30 @@ public class PTXVectorWrapper implements ObjectBuffer {
      * Copy data from the device to the main host.
      *
      * @param address
-     *            Device Buffer ID
+     *     Device Buffer ID
      * @param bytes
-     *            Bytes to be copied back to the host
+     *     Bytes to be copied back to the host
      * @param value
-     *            Host array that resides the final data
+     *     Host array that resides the final data
      * @param waitEvents
-     *            List of events to wait for.
+     *     List of events to wait for.
      * @return Event information
      */
-    private int enqueueReadArrayData(long address, long bytes, Object value, long hostOffset, int[] waitEvents) {
-        if (kind == JavaKind.Int) {
-            return deviceContext.enqueueReadBuffer(address, bytes, (int[]) value, hostOffset, waitEvents);
-        } else if (kind == JavaKind.Float) {
-            return deviceContext.enqueueReadBuffer(address, bytes, (float[]) value, hostOffset, waitEvents);
-        } else if (kind == JavaKind.Double) {
-            return deviceContext.enqueueReadBuffer(address, bytes, (double[]) value, hostOffset, waitEvents);
-        } else if (kind == JavaKind.Long) {
-            return deviceContext.enqueueReadBuffer(address, bytes, (long[]) value, hostOffset, waitEvents);
-        } else if (kind == JavaKind.Short) {
-            return deviceContext.enqueueReadBuffer(address, bytes, (short[]) value, hostOffset, waitEvents);
-        } else if (kind == JavaKind.Byte) {
-            return deviceContext.enqueueReadBuffer(address, bytes, (byte[]) value, hostOffset, waitEvents);
-        } else {
-            TornadoInternalError.shouldNotReachHere("Expecting an array type");
-        }
-        return -1;
+    private int enqueueReadArrayData(long executionPlanId, long address, long bytes, Object value, long hostOffset, int[] waitEvents) {
+        return switch (kind) {
+            case JavaKind.Int -> deviceContext.enqueueReadBuffer(executionPlanId, address, bytes, (int[]) value, hostOffset, waitEvents);
+            case JavaKind.Float -> deviceContext.enqueueReadBuffer(executionPlanId, address, bytes, (float[]) value, hostOffset, waitEvents);
+            case JavaKind.Double -> deviceContext.enqueueReadBuffer(executionPlanId, address, bytes, (double[]) value, hostOffset, waitEvents);
+            case JavaKind.Long -> deviceContext.enqueueReadBuffer(executionPlanId, address, bytes, (long[]) value, hostOffset, waitEvents);
+            case JavaKind.Short -> deviceContext.enqueueReadBuffer(executionPlanId, address, bytes, (short[]) value, hostOffset, waitEvents);
+            case JavaKind.Byte -> deviceContext.enqueueReadBuffer(executionPlanId, address, bytes, (byte[]) value, hostOffset, waitEvents);
+            case JavaKind.Object -> deviceContext.enqueueReadBuffer(executionPlanId, address, bytes, ((TornadoNativeArray) value).getSegmentWithHeader().address(), hostOffset, waitEvents);
+            default -> throw new TornadoRuntimeException(STR."Type not supported: \{value.getClass()}");
+        };
     }
 
     @Override
-    public List<Integer> enqueueWrite(final Object value, long batchSize, long hostOffset, final int[] events, boolean useDeps) {
+    public List<Integer> enqueueWrite(long executionPlanId, final Object value, long batchSize, long hostOffset, final int[] events, boolean useDeps) {
         TornadoInternalError.guarantee(value instanceof PrimitiveStorage, "Expecting a PrimitiveStorage type");
         final Object array = TornadoUtils.getAnnotatedObjectFromField(value, Payload.class);
         ArrayList<Integer> listEvents = new ArrayList<>();
@@ -170,68 +180,64 @@ public class PTXVectorWrapper implements ObjectBuffer {
         if (array == null) {
             throw new TornadoRuntimeException("ERROR] Data to be copied is NULL");
         }
-        final int returnEvent = enqueueWriteArrayData(toBuffer(), bufferSize, array, hostOffset, (useDeps) ? events : null);
+        final int returnEvent = enqueueWriteArrayData(executionPlanId, toBuffer(), bufferSize, array, hostOffset, (useDeps) ? events : null);
         listEvents.add(returnEvent);
-        return useDeps ? listEvents : null;
+        return listEvents;
     }
 
-    private int enqueueWriteArrayData(long address, long bytes, Object value, long hostOffset, int[] waitEvents) {
-        if (kind == JavaKind.Int) {
-            return deviceContext.enqueueWriteBuffer(address, bytes, (int[]) value, hostOffset, waitEvents);
-        } else if (kind == JavaKind.Float) {
-            return deviceContext.enqueueWriteBuffer(address, bytes, (float[]) value, hostOffset, waitEvents);
-        } else if (kind == JavaKind.Double) {
-            return deviceContext.enqueueWriteBuffer(address, bytes, (double[]) value, hostOffset, waitEvents);
-        } else if (kind == JavaKind.Long) {
-            return deviceContext.enqueueWriteBuffer(address, bytes, (long[]) value, hostOffset, waitEvents);
-        } else if (kind == JavaKind.Short) {
-            return deviceContext.enqueueWriteBuffer(address, bytes, (short[]) value, hostOffset, waitEvents);
-        } else if (kind == JavaKind.Byte) {
-            return deviceContext.enqueueWriteBuffer(address, bytes, (byte[]) value, hostOffset, waitEvents);
-        } else {
-            TornadoInternalError.shouldNotReachHere("Expecting an array type");
-        }
-        return -1;
+    private int enqueueWriteArrayData(long executionPlanId, long address, long bytes, Object value, long hostOffset, int[] waitEvents) {
+        return switch (kind) {
+            case JavaKind.Int -> deviceContext.enqueueWriteBuffer(executionPlanId, address, bytes, (int[]) value, hostOffset, waitEvents);
+            case JavaKind.Float -> deviceContext.enqueueWriteBuffer(executionPlanId, address, bytes, (float[]) value, hostOffset, waitEvents);
+            case JavaKind.Double -> deviceContext.enqueueWriteBuffer(executionPlanId, address, bytes, (double[]) value, hostOffset, waitEvents);
+            case JavaKind.Long -> deviceContext.enqueueWriteBuffer(executionPlanId, address, bytes, (long[]) value, hostOffset, waitEvents);
+            case JavaKind.Short -> deviceContext.enqueueWriteBuffer(executionPlanId, address, bytes, (short[]) value, hostOffset, waitEvents);
+            case JavaKind.Byte -> deviceContext.enqueueWriteBuffer(executionPlanId, address, bytes, (byte[]) value, hostOffset, waitEvents);
+            case JavaKind.Object -> deviceContext.enqueueWriteBuffer(executionPlanId, address, bytes, ((TornadoNativeArray) value).getSegmentWithHeader().address(), hostOffset, waitEvents);
+            default -> throw new TornadoRuntimeException(STR."Type not supported: \{value.getClass()}");
+        };
     }
 
     @Override
-    public void read(final Object value) {
+    public void read(long executionPlanId, final Object value) {
         // TODO: reading with offset != 0
-        read(value, 0, null, false);
+        read(executionPlanId, value, 0, 0, null, false);
     }
 
     @Override
-    public int read(final Object value, long hostOffset, int[] events, boolean useDeps) {
+    public int read(long executionPlanId, final Object value, long hostOffset, long partialReadSize, int[] events, boolean useDeps) {
         TornadoInternalError.guarantee(value instanceof PrimitiveStorage, "Expecting a PrimitiveStorage type");
         final Object array = TornadoUtils.getAnnotatedObjectFromField(value, Payload.class);
         if (array == null) {
             throw new TornadoRuntimeException("[ERROR] output data is NULL");
         }
 
-        return readArrayData(toBuffer(), bufferSize, array, hostOffset, (useDeps) ? events : null);
+        return readArrayData(executionPlanId, toBuffer(), bufferSize, array, hostOffset, (useDeps) ? events : null);
     }
 
-    private int readArrayData(long address, long bytes, Object value, long hostOffset, int[] waitEvents) {
-        if (kind == JavaKind.Int) {
-            return deviceContext.readBuffer(address, bytes, (int[]) value, hostOffset, waitEvents);
-        } else if (kind == JavaKind.Float) {
-            return deviceContext.readBuffer(address, bytes, (float[]) value, hostOffset, waitEvents);
-        } else if (kind == JavaKind.Double) {
-            return deviceContext.readBuffer(address, bytes, (double[]) value, hostOffset, waitEvents);
-        } else if (kind == JavaKind.Long) {
-            return deviceContext.readBuffer(address, bytes, (long[]) value, hostOffset, waitEvents);
-        } else if (kind == JavaKind.Short) {
-            return deviceContext.readBuffer(address, bytes, (short[]) value, hostOffset, waitEvents);
-        } else if (kind == JavaKind.Byte) {
-            return deviceContext.readBuffer(address, bytes, (byte[]) value, hostOffset, waitEvents);
-        } else {
-            TornadoInternalError.shouldNotReachHere("Expecting an array type");
-        }
-        return -1;
+    private int readArrayData(long executionPlanId, long address, long bytes, Object value, long hostOffset, int[] waitEvents) {
+        return switch (kind) {
+            case JavaKind.Int -> deviceContext.readBuffer(executionPlanId, address, bytes, (int[]) value, hostOffset, waitEvents);
+            case JavaKind.Float -> deviceContext.readBuffer(executionPlanId, address, bytes, (float[]) value, hostOffset, waitEvents);
+            case JavaKind.Double -> deviceContext.readBuffer(executionPlanId, address, bytes, (double[]) value, hostOffset, waitEvents);
+            case JavaKind.Long -> deviceContext.readBuffer(executionPlanId, address, bytes, (long[]) value, hostOffset, waitEvents);
+            case JavaKind.Short -> deviceContext.readBuffer(executionPlanId, address, bytes, (short[]) value, hostOffset, waitEvents);
+            case JavaKind.Byte -> deviceContext.readBuffer(executionPlanId, address, bytes, (byte[]) value, hostOffset, waitEvents);
+            case JavaKind.Object -> deviceContext.readBuffer(executionPlanId, address, bytes, ((TornadoNativeArray) value).getSegmentWithHeader().address(), hostOffset, waitEvents);
+            default -> throw new TornadoRuntimeException(STR."Type not supported: \{value.getClass()}");
+        };
     }
 
     private long sizeOf(final Object array) {
-        return ((long) Array.getLength(array) * (long) kind.getByteCount());
+        long size;
+        if (array instanceof TornadoNativeArray nativeArray) {
+            size = nativeArray.getNumBytesOfSegment();
+        } else if (array.getClass() == HalfFloat[].class) {
+            size = (long) Array.getLength(array) * 2; // the size of half floats is two bytes
+        } else {
+            size = (long) Array.getLength(array) * kind.getByteCount();
+        }
+        return size;
     }
 
     @Override
@@ -240,7 +246,7 @@ public class PTXVectorWrapper implements ObjectBuffer {
     }
 
     @Override
-    public void setBuffer(ObjectBufferWrapper bufferWrapper) {
+    public void setBuffer(XPUBufferWrapper bufferWrapper) {
         TornadoInternalError.shouldNotReachHere();
     }
 
@@ -255,31 +261,26 @@ public class PTXVectorWrapper implements ObjectBuffer {
     }
 
     @Override
-    public void write(final Object value) {
+    public void write(long executionPlanId, final Object value) {
         TornadoInternalError.guarantee(value instanceof PrimitiveStorage, "Expecting a PrimitiveStorage type");
         final Object array = TornadoUtils.getAnnotatedObjectFromField(value, Payload.class);
         if (array == null) {
             throw new TornadoRuntimeException("[ERROR] data is NULL");
         }
         // TODO: Writing with offset != 0
-        writeArrayData(toBuffer(), bufferSize, array, 0, null);
+        writeArrayData(executionPlanId, toBuffer(), bufferSize, array, 0, null);
     }
 
-    private void writeArrayData(long address, long bytes, Object value, long hostOffset, int[] waitEvents) {
-        if (kind == JavaKind.Int) {
-            deviceContext.writeBuffer(address, bytes, (int[]) value, hostOffset, waitEvents);
-        } else if (kind == JavaKind.Float) {
-            deviceContext.writeBuffer(address, bytes, (float[]) value, (int) hostOffset, waitEvents);
-        } else if (kind == JavaKind.Double) {
-            deviceContext.writeBuffer(address, bytes, (double[]) value, (int) hostOffset, waitEvents);
-        } else if (kind == JavaKind.Long) {
-            deviceContext.writeBuffer(address, bytes, (long[]) value, (int) hostOffset, waitEvents);
-        } else if (kind == JavaKind.Short) {
-            deviceContext.writeBuffer(address, bytes, (short[]) value, hostOffset, waitEvents);
-        } else if (kind == JavaKind.Byte) {
-            deviceContext.writeBuffer(address, bytes, (byte[]) value, hostOffset, waitEvents);
-        } else {
-            TornadoInternalError.shouldNotReachHere("Expecting an array type");
+    private void writeArrayData(long executionPlanId, long address, long bytes, Object value, long hostOffset, int[] waitEvents) {
+        switch (kind) {
+            case JavaKind.Int -> deviceContext.writeBuffer(executionPlanId, address, bytes, (int[]) value, (int) hostOffset, waitEvents);
+            case JavaKind.Float -> deviceContext.writeBuffer(executionPlanId, address, bytes, (float[]) value, (int) hostOffset, waitEvents);
+            case JavaKind.Double -> deviceContext.writeBuffer(executionPlanId, address, bytes, (double[]) value, (int) hostOffset, waitEvents);
+            case JavaKind.Long -> deviceContext.writeBuffer(executionPlanId, address, bytes, (long[]) value, (int) hostOffset, waitEvents);
+            case JavaKind.Short -> deviceContext.writeBuffer(executionPlanId, address, bytes, (short[]) value, hostOffset, waitEvents);
+            case JavaKind.Byte -> deviceContext.writeBuffer(executionPlanId, address, bytes, (byte[]) value, hostOffset, waitEvents);
+            case JavaKind.Object -> deviceContext.writeBuffer(executionPlanId, address, bytes, ((TornadoNativeArray) value).getSegmentWithHeader().address(), hostOffset, waitEvents);
+            default -> throw new TornadoRuntimeException(STR."Type not supported: \{value.getClass()}");
         }
     }
 
@@ -297,9 +298,13 @@ public class PTXVectorWrapper implements ObjectBuffer {
                 return JavaKind.Short;
             } else if (type == byte[].class) {
                 return JavaKind.Byte;
+            } else if (type == HalfFloat[].class) {
+                return JavaKind.Object;
             } else {
-                warn("cannot wrap field: array type=%s", type.getName());
+                logger.warn("cannot wrap field: array type=%s", type.getName());
             }
+        } else if (type == FloatArray.class || type == IntArray.class || type == DoubleArray.class || type == LongArray.class || type == ShortArray.class || type == CharArray.class || type == ByteArray.class || type == HalfFloatArray.class) {
+            return JavaKind.Object;
         } else {
             TornadoInternalError.shouldNotReachHere("The type should be an array");
         }
@@ -307,13 +312,18 @@ public class PTXVectorWrapper implements ObjectBuffer {
     }
 
     @Override
-    public void setSizeSubRegion(long batchSize) {
-        this.setSubRegionSize = batchSize;
+    public long getSizeSubRegionSize() {
+        return setSubRegionSize;
     }
 
     @Override
-    public long getSizeSubRegion() {
-        return setSubRegionSize;
+    public int[] getIntBuffer() {
+        return XPUBuffer.super.getIntBuffer();
+    }
+
+    @Override
+    public void setIntBuffer(int[] arr) {
+        XPUBuffer.super.setIntBuffer(arr);
     }
 
 }

@@ -2,7 +2,7 @@
  * This file is part of Tornado: A heterogeneous programming framework:
  * https://github.com/beehive-lab/tornadovm
  *
- * Copyright (c) 2021-2022, APT Group, Department of Computer Science,
+ * Copyright (c) 2021-2022, 2024, APT Group, Department of Computer Science,
  * School of Engineering, The University of Manchester. All rights reserved.
  * Copyright (c) 2009-2021, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
@@ -13,7 +13,7 @@
  *
  * This code is distributed in the hope that it will be useful, but WITHOUT
  * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
- * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License
  * version 2 for more details (a copy is included in the LICENSE file that
  * accompanied this code).
  *
@@ -104,13 +104,16 @@ import uk.ac.manchester.beehivespirvtoolkit.lib.instructions.operands.SPIRVOptio
 import uk.ac.manchester.beehivespirvtoolkit.lib.instructions.operands.SPIRVSourceLanguage;
 import uk.ac.manchester.beehivespirvtoolkit.lib.instructions.operands.SPIRVStorageClass;
 import uk.ac.manchester.tornado.api.KernelContext;
+import uk.ac.manchester.tornado.api.exceptions.TornadoBailoutRuntimeException;
 import uk.ac.manchester.tornado.api.exceptions.TornadoDeviceFP64NotSupported;
 import uk.ac.manchester.tornado.api.exceptions.TornadoInternalError;
+import uk.ac.manchester.tornado.api.exceptions.TornadoRuntimeException;
 import uk.ac.manchester.tornado.api.profiler.ProfilerType;
 import uk.ac.manchester.tornado.api.profiler.TornadoProfiler;
-import uk.ac.manchester.tornado.drivers.common.BackendDeopt;
 import uk.ac.manchester.tornado.drivers.common.logging.Logger;
+import uk.ac.manchester.tornado.drivers.common.utils.BackendDeopt;
 import uk.ac.manchester.tornado.drivers.opencl.graal.nodes.FPGAWorkGroupSizeNode;
+import uk.ac.manchester.tornado.drivers.opencl.graal.nodes.WriteHalfFloatNode;
 import uk.ac.manchester.tornado.drivers.spirv.graal.SPIRVArchitecture;
 import uk.ac.manchester.tornado.drivers.spirv.graal.SPIRVCodeProvider;
 import uk.ac.manchester.tornado.drivers.spirv.graal.SPIRVFrameContext;
@@ -130,13 +133,12 @@ import uk.ac.manchester.tornado.drivers.spirv.graal.compiler.SPIRVNodeLIRBuilder
 import uk.ac.manchester.tornado.drivers.spirv.graal.compiler.SPIRVNodeMatchRules;
 import uk.ac.manchester.tornado.drivers.spirv.graal.compiler.SPIRVReferenceMapBuilder;
 import uk.ac.manchester.tornado.drivers.spirv.graal.lir.SPIRVKind;
-import uk.ac.manchester.tornado.drivers.spirv.mm.SPIRVKernelArgs;
-import uk.ac.manchester.tornado.runtime.common.Tornado;
+import uk.ac.manchester.tornado.drivers.spirv.mm.SPIRVKernelStackFrame;
 import uk.ac.manchester.tornado.runtime.common.TornadoOptions;
-import uk.ac.manchester.tornado.runtime.graal.backend.TornadoBackend;
+import uk.ac.manchester.tornado.runtime.graal.backend.XPUBackend;
 import uk.ac.manchester.tornado.runtime.tasks.meta.TaskMetaData;
 
-public class SPIRVBackend extends TornadoBackend<SPIRVProviders> implements FrameMap.ReferenceMapBuilderFactory {
+public class SPIRVBackend extends XPUBackend<SPIRVProviders> implements FrameMap.ReferenceMapBuilderFactory {
 
     private final OptionValues options;
     private final SPIRVTargetDescription targetDescription;
@@ -148,6 +150,8 @@ public class SPIRVBackend extends TornadoBackend<SPIRVProviders> implements Fram
     private SPIRVId pointerToULongFunction;
     private SPIRVInstScope blockScope;
     private boolean fp64CapabilityEnabled;
+
+    private boolean fp16CapabilityEnabled;
     private boolean supportsFP64;
     private AtomicInteger methodIndex;
 
@@ -225,8 +229,8 @@ public class SPIRVBackend extends TornadoBackend<SPIRVProviders> implements Fram
         return this.context;
     }
 
-    public void reset() {
-        getDeviceContext().reset();
+    public void reset(long executionPlanId) {
+        getDeviceContext().reset(executionPlanId);
     }
 
     @Override
@@ -348,6 +352,11 @@ public class SPIRVBackend extends TornadoBackend<SPIRVProviders> implements Fram
         fp64CapabilityEnabled = true;
     }
 
+    private void emitFP16Capability(SPIRVModule module) {
+        module.add(new SPIRVOpCapability(SPIRVCapability.Float16Buffer())); // To use FP16
+        fp16CapabilityEnabled = true;
+    }
+
     private void emitSPIRVCapabilities(SPIRVModule module) {
         // Emit Capabilities
         module.add(new SPIRVOpCapability(SPIRVCapability.Addresses())); // Uses physical addressing, non-logical addressing modes.
@@ -376,7 +385,9 @@ public class SPIRVBackend extends TornadoBackend<SPIRVProviders> implements Fram
     }
 
     private SPIRVLiteralContextDependentNumber buildLiteralContextNumber(SPIRVKind kind, Constant value) {
-        if (kind == SPIRVKind.OP_TYPE_INT_32) {
+        if (kind == SPIRVKind.OP_TYPE_FLOAT_16) {
+            return new SPIRVContextDependentFloat(Float.parseFloat(value.toValueString()));
+        } else if (kind == SPIRVKind.OP_TYPE_INT_32) {
             return new SPIRVContextDependentInt(BigInteger.valueOf(Integer.parseInt(value.toValueString())));
         } else if (kind == SPIRVKind.OP_TYPE_INT_64) {
             return new SPIRVContextDependentLong(BigInteger.valueOf(Long.parseLong(value.toValueString())));
@@ -385,7 +396,7 @@ public class SPIRVBackend extends TornadoBackend<SPIRVProviders> implements Fram
         } else if (kind == SPIRVKind.OP_TYPE_FLOAT_64) {
             return new SPIRVContextDependentDouble(Double.parseDouble(value.toValueString()));
         } else {
-            throw new RuntimeException("SPIRV - SPIRVLiteralContextDependentNumber Type not supported");
+            throw new TornadoRuntimeException("SPIRV - SPIRVLiteralContextDependentNumber Type not supported");
         }
     }
 
@@ -421,14 +432,12 @@ public class SPIRVBackend extends TornadoBackend<SPIRVProviders> implements Fram
             for (LIRInstruction lirInstruction : lir.getLIRforBlock(lir.getBlockById(block))) {
 
                 lirInstruction.forEachOutput((instruction, value, mode, flags) -> {
-                    if (value instanceof ArrayVariable) {
+                    if (value instanceof ArrayVariable variable) {
                         // All function variables, including arrays, must be defined a consecutive block
                         // of instructions from the block 0. We detect array declaration and define
                         // these as array for the SPIR-V Function StorageClass.
-                        ArrayVariable variable = (ArrayVariable) value;
                         resultArrays.add(variable);
-                    } else if (value instanceof Variable) {
-                        Variable variable = (Variable) value;
+                    } else if (value instanceof Variable variable) {
                         if (variable.toString() != null) {
                             addVariableDef(kindToVariable, variable);
                             variableCount.incrementAndGet();
@@ -439,18 +448,18 @@ public class SPIRVBackend extends TornadoBackend<SPIRVProviders> implements Fram
             }
         }
 
-        if (Tornado.FULL_DEBUG) {
+        if (TornadoOptions.FULL_DEBUG) {
             Logger.traceCodeGen(Logger.BACKEND.SPIRV, "found %d variable, expected (%d)", variableCount.get(), expectedVariables);
         }
 
         int index = 0;
         for (SPIRVKind spirvKind : kindToVariable.keySet()) {
-            if (Tornado.FULL_DEBUG) {
+            if (TornadoOptions.FULL_DEBUG) {
                 Logger.traceCodeGen(Logger.BACKEND.SPIRV, "VARIABLES -------------- ");
                 Logger.traceCodeGen(Logger.BACKEND.SPIRV, "\tTYPE: " + spirvKind);
             }
             for (Variable var : kindToVariable.get(spirvKind)) {
-                if (Tornado.FULL_DEBUG) {
+                if (TornadoOptions.FULL_DEBUG) {
                     Logger.traceCodeGen(Logger.BACKEND.SPIRV, "\tNAME: " + var);
                 }
                 SPIRVId variable = asm.module.getNextId();
@@ -486,8 +495,8 @@ public class SPIRVBackend extends TornadoBackend<SPIRVProviders> implements Fram
         }
 
         // Look for other builtins
-        if (cfg.graph.getNodes().filter(SPIRVThreadBuiltIn.LOCAL_THREAD_ID.getNodeClass()).isNotEmpty()
-                || cfg.graph.getNodes().filter(SPIRVThreadBuiltIn.LOCAL_THREAD_ID.getOptionalNodeClass()).isNotEmpty()) {
+        if (cfg.graph.getNodes().filter(SPIRVThreadBuiltIn.LOCAL_THREAD_ID.getNodeClass()).isNotEmpty() || cfg.graph.getNodes().filter(SPIRVThreadBuiltIn.LOCAL_THREAD_ID.getOptionalNodeClass())
+                .isNotEmpty()) {
             SPIRVId id = asm.emitDecorateOpenCLBuiltin(module, SPIRVThreadBuiltIn.LOCAL_THREAD_ID);
             SPIRVSymbolTable.put(SPIRVThreadBuiltIn.LOCAL_THREAD_ID.name, id);
             asm.builtinTable.put(SPIRVThreadBuiltIn.LOCAL_THREAD_ID, id);
@@ -499,8 +508,8 @@ public class SPIRVBackend extends TornadoBackend<SPIRVProviders> implements Fram
             asm.builtinTable.put(SPIRVThreadBuiltIn.GROUP_ID, id);
         }
 
-        if (cfg.graph.getNodes().filter(SPIRVThreadBuiltIn.WORKGROUP_SIZE.getNodeClass()).isNotEmpty()
-                || cfg.graph.getNodes().filter(SPIRVThreadBuiltIn.WORKGROUP_SIZE.getOptionalNodeClass()).isNotEmpty()) {
+        if (cfg.graph.getNodes().filter(SPIRVThreadBuiltIn.WORKGROUP_SIZE.getNodeClass()).isNotEmpty() || cfg.graph.getNodes().filter(SPIRVThreadBuiltIn.WORKGROUP_SIZE.getOptionalNodeClass())
+                .isNotEmpty()) {
             SPIRVId id = asm.emitDecorateOpenCLBuiltin(module, SPIRVThreadBuiltIn.WORKGROUP_SIZE);
             SPIRVSymbolTable.put(SPIRVThreadBuiltIn.WORKGROUP_SIZE.name, id);
             asm.builtinTable.put(SPIRVThreadBuiltIn.WORKGROUP_SIZE, id);
@@ -606,6 +615,9 @@ public class SPIRVBackend extends TornadoBackend<SPIRVProviders> implements Fram
         if (idTable.kindToVariable.containsKey(SPIRVKind.OP_TYPE_FLOAT_64)) {
             emitFP64Capability(asm.module);
         }
+        if (idTable.kindToVariable.containsKey(SPIRVKind.OP_TYPE_FLOAT_16)) {
+            emitFP16Capability(asm.module);
+        }
 
         // Emit the Store between from the parameter value and the local variable
         // assigned
@@ -668,7 +680,7 @@ public class SPIRVBackend extends TornadoBackend<SPIRVProviders> implements Fram
             if (l.getType().getJavaKind() == JavaKind.Object) {
                 // Check here if it is a vector Component Type
                 String javaName = l.getType().toJavaName();
-                if (javaName.startsWith(SPIRVKind.VECTOR_COLLECTION_PATH)) {
+                if (javaName.startsWith(SPIRVKind.COLLECTION_PATH) || javaName.startsWith(SPIRVKind.VECTOR_COLLECTION_PATH)) {
                     String[] vectorTypeNames = javaName.split("\\.");
                     int nameIndex = vectorTypeNames.length - 1;
                     kind = SPIRVKind.getKindFromStringClassVector(vectorTypeNames[nameIndex]);
@@ -749,11 +761,11 @@ public class SPIRVBackend extends TornadoBackend<SPIRVProviders> implements Fram
      * Example:
      *
      * <code>
-     *     %spirv_BuiltinGlobalSize = OpVariable %ptr_Input_v3long Input
+     * %spirv_BuiltinGlobalSize = OpVariable %ptr_Input_v3long Input
      * </code>
      *
      * @param asm
-     *            {@link SPIRVAssembler}
+     *     {@link SPIRVAssembler}
      */
     public void emitBuiltinVariables(SPIRVAssembler asm) {
         SPIRVId ptrV3ulong = asm.primitives.getPtrOpTypePointerWithStorage(SPIRVKind.OP_TYPE_VECTOR3_INT_64, SPIRVStorageClass.Input());
@@ -766,7 +778,7 @@ public class SPIRVBackend extends TornadoBackend<SPIRVProviders> implements Fram
         final ControlFlowGraph cfg = (ControlFlowGraph) lir.getControlFlowGraph();
 
         if (cfg.getStartBlock().getEndNode().predecessor() instanceof FPGAWorkGroupSizeNode) {
-            throw new RuntimeException("FPGA Thread Attributes not supported yet.");
+            throw new TornadoBailoutRuntimeException("FPGA Thread Attributes not supported yet.");
         }
 
         emitSPIRVCapabilities(module);
@@ -783,6 +795,9 @@ public class SPIRVBackend extends TornadoBackend<SPIRVProviders> implements Fram
         if (idTable.kindToVariable.containsKey(SPIRVKind.OP_TYPE_FLOAT_64)) {
             emitFP64Capability(module);
         }
+        if (idTable.kindToVariable.containsKey(SPIRVKind.OP_TYPE_FLOAT_16)) {
+            emitFP16Capability(module);
+        }
 
         // ----------------------------------
         // Emit Entry Kernel
@@ -790,7 +805,7 @@ public class SPIRVBackend extends TornadoBackend<SPIRVProviders> implements Fram
         if (fp64CapabilityEnabled && !supportsFP64) {
             throw new TornadoDeviceFP64NotSupported("Error - The current SPIR-V device does not support FP64");
         }
-        asm.emitEntryPointMainKernel(cfg.graph, method.getName(), fp64CapabilityEnabled);
+        asm.emitEntryPointMainKernel(cfg.graph, method.getName(), fp64CapabilityEnabled, fp16CapabilityEnabled);
 
         // Add all KINDS we generate the corresponding declaration
         for (SPIRVKind kind : idTable.kindToVariable.keySet()) {
@@ -808,12 +823,18 @@ public class SPIRVBackend extends TornadoBackend<SPIRVProviders> implements Fram
             JavaKind stackKind = constantNode.getStackKind();
             Constant value = constantNode.getValue();
 
-            SPIRVKind kind = SPIRVKind.fromJavaKind(stackKind);
+            SPIRVKind kind;
+            if (constantNode.usages().filter(WriteHalfFloatNode.class).isNotEmpty()) {
+                kind = SPIRVKind.OP_TYPE_FLOAT_16;
+            } else {
+                kind = SPIRVKind.fromJavaKind(stackKind);
+            }
+
             SPIRVId typeId;
             if (kind.isPrimitive()) {
                 typeId = asm.primitives.getTypePrimitive(kind);
             } else {
-                throw new RuntimeException("Type not supported");
+                throw new TornadoRuntimeException("Type not supported");
             }
 
             SPIRVLiteralContextDependentNumber literalNumber = buildLiteralContextNumber(kind, value);
@@ -821,14 +842,14 @@ public class SPIRVBackend extends TornadoBackend<SPIRVProviders> implements Fram
         }
 
         // Add constant 3 --> Frame Access
-        int reservedSlots = SPIRVKernelArgs.RESERVED_SLOTS;
+        int reservedSlots = SPIRVKernelStackFrame.RESERVED_SLOTS;
         asm.lookUpConstant(Integer.toString(reservedSlots), SPIRVKind.OP_TYPE_INT_32);
 
         // And the reminder of the constants
         while (!stack.isEmpty()) {
             TypeConstant t = stack.pop();
             SPIRVId idConstant = module.getNextId();
-            module.add(new SPIRVOpConstant(t.typeID, idConstant, t.n));
+            module.add(new SPIRVOpConstant(t.typeID, idConstant, t.literalContextNumber));
             asm.getConstants().put(new SPIRVAssembler.ConstantKeyPair(t.valueString, t.kind), idConstant);
         }
 
@@ -869,13 +890,13 @@ public class SPIRVBackend extends TornadoBackend<SPIRVProviders> implements Fram
 
     private static class TypeConstant {
         public SPIRVId typeID;
-        public SPIRVLiteralContextDependentNumber n;
+        public SPIRVLiteralContextDependentNumber literalContextNumber;
         public String valueString;
         public SPIRVKind kind;
 
-        public TypeConstant(SPIRVId typeID, SPIRVLiteralContextDependentNumber n, String valueString, SPIRVKind kind) {
+        public TypeConstant(SPIRVId typeID, SPIRVLiteralContextDependentNumber literal, String valueString, SPIRVKind kind) {
             this.typeID = typeID;
-            this.n = n;
+            this.literalContextNumber = literal;
             this.valueString = valueString;
             this.kind = kind;
         }

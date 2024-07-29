@@ -1,7 +1,7 @@
 /*
  * MIT License
  *
- * Copyright (c) 2020-2022, APT Group, Department of Computer Science,
+ * Copyright (c) 2020-2022, 2024, APT Group, Department of Computer Science,
  * School of Engineering, The University of Manchester. All rights reserved.
  * Copyright (c) 2013-2020, APT Group, Department of Computer Science,
  * The University of Manchester. All rights reserved.
@@ -43,5 +43,17 @@
         std::cout << "[TornadoVM-OCL-JNI] ERROR : " << name    \
         << " -> Returned: " << result                          \
         << std::endl;                                          \
+    }
+
+#define LOG_NVML_AND_VALIDATE(name, result)                         \
+    if (LOG_JNI == 1)  {                                            \
+        std::cout << "[TornadoVM-OCL-NVML-JNI] Calling : " << name  \
+        << " -> Status: " << result                                 \
+        << std::endl;                                               \
+    }                                                               \
+    if (result != NVML_SUCCESS)  {                                  \
+        std::cout << "[TornadoVM-OCL-NVML-JNI] ERROR : " << name    \
+        << " -> Returned: " << result                               \
+        << std::endl;                                               \
     }
 #endif

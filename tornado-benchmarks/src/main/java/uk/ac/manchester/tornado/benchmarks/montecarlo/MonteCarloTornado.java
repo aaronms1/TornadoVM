@@ -1,12 +1,12 @@
 /*
- * Copyright (c) 2013-2020, 2022, APT Group, Department of Computer Science,
+ * Copyright (c) 2013-2023, APT Group, Department of Computer Science,
  * The University of Manchester.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *    http://www.apache.org/licenses/LICENSE-2.0
+ * http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,16 +15,15 @@
  * limitations under the License.
  *
  */
-
 package uk.ac.manchester.tornado.benchmarks.montecarlo;
 
-import static uk.ac.manchester.tornado.api.collections.math.TornadoMath.abs;
+import static uk.ac.manchester.tornado.api.math.TornadoMath.abs;
 
 import uk.ac.manchester.tornado.api.TaskGraph;
 import uk.ac.manchester.tornado.api.TornadoExecutionPlan;
 import uk.ac.manchester.tornado.api.common.TornadoDevice;
 import uk.ac.manchester.tornado.api.enums.DataTransferMode;
-import uk.ac.manchester.tornado.api.runtime.TornadoRuntime;
+import uk.ac.manchester.tornado.api.types.arrays.FloatArray;
 import uk.ac.manchester.tornado.benchmarks.BenchmarkDriver;
 import uk.ac.manchester.tornado.benchmarks.ComputeKernels;
 
@@ -33,12 +32,12 @@ import uk.ac.manchester.tornado.benchmarks.ComputeKernels;
  * How to run?
  * </p>
  * <code>
- *     tornado -m tornado.benchmarks/uk.ac.manchester.tornado.benchmarks.BenchmarkRunner montecarlo
+ * tornado -m tornado.benchmarks/uk.ac.manchester.tornado.benchmarks.BenchmarkRunner montecarlo
  * </code>
  */
 public class MonteCarloTornado extends BenchmarkDriver {
 
-    private float[] output;
+    private FloatArray output;
     private int size;
 
     public MonteCarloTornado(int iterations, int size) {
@@ -48,7 +47,7 @@ public class MonteCarloTornado extends BenchmarkDriver {
 
     @Override
     public void setUp() {
-        output = new float[size];
+        output = new FloatArray(size);
         taskGraph = new TaskGraph("benchmark") //
                 .task("montecarlo", ComputeKernels::monteCarlo, output, size) //
                 .transferToHost(DataTransferMode.EVERY_EXECUTION, output);
@@ -66,27 +65,23 @@ public class MonteCarloTornado extends BenchmarkDriver {
     }
 
     @Override
-    public void benchmarkMethod(TornadoDevice device) {
+    public void runBenchmark(TornadoDevice device) {
         executionResult = executionPlan.withDevice(device).execute();
     }
 
     @Override
     public boolean validate(TornadoDevice device) {
-        float[] result;
+        FloatArray result;
         boolean isCorrect = true;
 
-        result = new float[size];
+        result = new FloatArray(size);
 
         ComputeKernels.monteCarlo(result, size);
-        executionPlan.withDevice(device).withWarmUp();
-        for (int i = 0; i < 3; i++) {
-            executionPlan.execute();
-        }
-        executionResult.transferToHost(output);
+        executionPlan.withDevice(device).execute();
         executionPlan.clearProfiles();
 
         for (int i = 0; i < size; i++) {
-            if (abs(output[i] - result[i]) > 0.01) {
+            if (abs(output.get(i) - result.get(i)) > 0.01) {
                 isCorrect = false;
                 break;
             }
@@ -95,11 +90,4 @@ public class MonteCarloTornado extends BenchmarkDriver {
         return isCorrect;
     }
 
-    public void printSummary() {
-        if (isValid()) {
-            System.out.printf("id=%s, elapsed=%f, per iteration=%f\n", TornadoRuntime.getProperty("benchmark.device"), getElapsed(), getElapsedPerIteration());
-        } else {
-            System.out.printf("id=%s produced invalid result\n", TornadoRuntime.getProperty("benchmark.device"));
-        }
-    }
 }

@@ -2,7 +2,7 @@
  * This file is part of Tornado: A heterogeneous programming framework:
  * https://github.com/beehive-lab/tornadovm
  *
- * Copyright (c) 2013-2020,2023 APT Group, Department of Computer Science,
+ * Copyright (c) 2013-2020, 2023-2024, APT Group, Department of Computer Science,
  * The University of Manchester. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
@@ -12,15 +12,13 @@
  *
  * This code is distributed in the hope that it will be useful, but WITHOUT
  * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
- * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License
  * version 2 for more details (a copy is included in the LICENSE file that
  * accompanied this code).
  *
  * You should have received a copy of the GNU General Public License version
  * 2 along with this work; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
- *
- *
  */
 package uk.ac.manchester.tornado.runtime.tasks.meta;
 
@@ -39,11 +37,11 @@ import uk.ac.manchester.tornado.api.common.TornadoDevice;
 import uk.ac.manchester.tornado.api.common.TornadoEvents;
 import uk.ac.manchester.tornado.api.memory.TaskMetaDataInterface;
 import uk.ac.manchester.tornado.api.profiler.TornadoProfiler;
-import uk.ac.manchester.tornado.runtime.TornadoAcceleratorDriver;
+import uk.ac.manchester.tornado.runtime.TornadoAcceleratorBackend;
 import uk.ac.manchester.tornado.runtime.TornadoCoreRuntime;
 import uk.ac.manchester.tornado.runtime.common.Tornado;
-import uk.ac.manchester.tornado.runtime.common.TornadoAcceleratorDevice;
 import uk.ac.manchester.tornado.runtime.common.TornadoOptions;
+import uk.ac.manchester.tornado.runtime.common.TornadoXPUDevice;
 
 public abstract class AbstractMetaData implements TaskMetaDataInterface {
 
@@ -51,7 +49,8 @@ public abstract class AbstractMetaData implements TaskMetaDataInterface {
     private static final String TRUE = "True";
     private static final String FALSE = "False";
     private final boolean isDeviceDefined;
-    private final HashSet<String> openCLBuiltOptions = new HashSet<>(Arrays.asList( //
+
+    private final HashSet<String> openCLBuiltOptions = new HashSet<>(Arrays.asList(//
             "-cl-single-precision-constant", //
             "-cl-denorms-are-zero", //
             "-cl-opt-disable", //
@@ -64,41 +63,26 @@ public abstract class AbstractMetaData implements TaskMetaDataInterface {
             "-w", //
             "-cl-std=CL2.0" //
     ));
-    /*
-     * Forces the executing kernel to output its arguments before execution
-     */
-    private final boolean threadInfo;
-    private final boolean debug;
+
+    private boolean threadInfoEnabled;
+    private final boolean debugMode;
     private final boolean dumpEvents;
     private final boolean dumpProfiles;
-    private final boolean debugKernelArgs;
-    private final boolean printCompileTimes;
     private final boolean isOpenclGpuBlockXDefined;
     private final int openclGpuBlockX;
     private final boolean isOpenclGpuBlock2DXDefined;
     private final int openclGpuBlock2DX;
     private final boolean isOpenclGpuBlock2DYDefined;
     private final int openclGpuBlock2DY;
-    private final boolean openclUseRelativeAddresses;
-    private final boolean openclEnableBifs;
-    private final boolean openclWaitActive;
-    private final boolean vmWaitEvent;
-    private final boolean enableExceptions;
-    private final boolean enableProfiling;
-    private final boolean enableOooExecution;
-    private final boolean openclUseBlockingApiCalls;
     private final boolean enableParallelization;
-    private final boolean enableVectors;
-    private final boolean enableMemChecks;
     private final boolean useThreadCoarsener;
     private final boolean dumpTaskGraph;
-    private final boolean coarsenWithCpuConfig;
     private final boolean isEnableParallelizationDefined;
     private final boolean isCpuConfigDefined;
     private final String cpuConfig;
     private String id;
-    private TornadoAcceleratorDevice device;
-    private int driverIndex;
+    private TornadoXPUDevice device;
+    private int backendIndex;
     private int deviceIndex;
     private boolean deviceManuallySet;
     private long numThreads;
@@ -108,13 +92,12 @@ public abstract class AbstractMetaData implements TaskMetaDataInterface {
     private long[] ptxGridDim;
     private ResolvedJavaMethod graph;
     private boolean useGridScheduler;
-    private boolean printKernelExecutionTime;
     private boolean isOpenclCompilerFlagsDefined;
     private String openclCompilerOptions;
-    /*
-     * Allows the OpenCL driver to select the size of local work groups
-     */
+
     private boolean openclUseDriverScheduling;
+    private boolean printKernel;
+    private boolean resetThreads;
 
     AbstractMetaData(String id, AbstractMetaData parent) {
         this.id = id;
@@ -122,48 +105,31 @@ public abstract class AbstractMetaData implements TaskMetaDataInterface {
         isDeviceDefined = getProperty(id + ".device") != null;
         if (isDeviceDefined) {
             int[] a = MetaDataUtils.resolveDriverDeviceIndexes(getProperty(id + ".device"));
-            driverIndex = a[0];
+            backendIndex = a[0];
             deviceIndex = a[1];
         } else if (null != parent) {
-            driverIndex = parent.getDriverIndex();
+            backendIndex = parent.getBackendIndex();
             deviceIndex = parent.getDeviceIndex();
         } else {
-            driverIndex = TornadoOptions.DEFAULT_DRIVER_INDEX;
+            backendIndex = TornadoOptions.DEFAULT_BACKEND_INDEX;
             deviceIndex = TornadoOptions.DEFAULT_DEVICE_INDEX;
         }
-
-        debugKernelArgs = parseBoolean(getDefault("debug.kernelargs", id, TRUE));
-        printCompileTimes = parseBoolean(getDefault("debug.compiletimes", id, FALSE));
-        printKernelExecutionTime = parseBoolean(getProperty("tornado.debug.executionTime"));
-        openclUseRelativeAddresses = parseBoolean(getDefault("opencl.userelative", id, FALSE));
-        openclWaitActive = parseBoolean(getDefault("opencl.wait.active", id, FALSE));
-        coarsenWithCpuConfig = parseBoolean(getDefault("coarsener.ascpu", id, FALSE));
-
-        /*
-         * Allows the OpenCL driver to select the size of local work groups
-         */
-        openclUseDriverScheduling = parseBoolean(getDefault("opencl.usedriver.schedule", id, FALSE));
-        vmWaitEvent = parseBoolean(getDefault("vm.waitevent", id, FALSE));
-        enableExceptions = parseBoolean(getDefault("exceptions.enable", id, FALSE));
-        enableProfiling = parseBoolean(getDefault("profiling.enable", id, FALSE));
-        enableOooExecution = parseBoolean(getDefault("ooo-execution.enable", id, FALSE));
-        openclUseBlockingApiCalls = parseBoolean(getDefault("opencl.blocking", id, FALSE));
 
         enableParallelization = parseBoolean(getDefault("parallelise", id, TRUE));
         isEnableParallelizationDefined = getProperty(id + ".parallelise") != null;
 
-        enableVectors = parseBoolean(getDefault("vectors.enable", id, TRUE));
-        openclEnableBifs = parseBoolean(getDefault("bifs.enable", id, FALSE));
-        threadInfo = parseBoolean(getDefault("threadInfo", id, FALSE));
-        debug = parseBoolean(getDefault("debug", id, FALSE));
-        enableMemChecks = parseBoolean(getDefault("memory.check", id, FALSE));
+        threadInfoEnabled = TornadoOptions.THREAD_INFO;
+        printKernel = TornadoOptions.PRINT_KERNEL_SOURCE;
+        debugMode = parseBoolean(getDefault("debug", id, FALSE));
         dumpEvents = parseBoolean(getDefault("events.dump", id, TRUE));
         dumpProfiles = parseBoolean(getDefault("profiles.print", id, FALSE));
         dumpTaskGraph = Boolean.parseBoolean(System.getProperty("dump.taskgraph", FALSE));
 
+        // Compilation flags - > only for OpenCL
         openclCompilerOptions = (getProperty("tornado.opencl.compiler.options") == null) ? "-w" : getProperty("tornado.opencl.compiler.options");
         isOpenclCompilerFlagsDefined = getProperty("tornado.opencl.compiler.options") != null;
 
+        // Thread Configurations
         openclGpuBlockX = parseInt(getDefault("opencl.gpu.block.x", id, "256"));
         isOpenclGpuBlockXDefined = getProperty(id + ".opencl.gpu.block.x") != null;
 
@@ -187,13 +153,13 @@ public abstract class AbstractMetaData implements TaskMetaDataInterface {
         return (propertyValue != null) ? propertyValue : Tornado.getProperty("tornado" + "." + keySuffix, defaultValue);
     }
 
-    public TornadoAcceleratorDevice getLogicDevice() {
-        return device != null ? device : (device = resolveDevice(Tornado.getProperty(id + ".device", driverIndex + ":" + deviceIndex)));
+    public TornadoXPUDevice getLogicDevice() {
+        return device != null ? device : (device = resolveDevice(Tornado.getProperty(id + ".device", backendIndex + ":" + deviceIndex)));
     }
 
     private int getDeviceIndex(int driverIndex, TornadoDevice device) {
-        TornadoAcceleratorDriver driver = TornadoCoreRuntime.getTornadoRuntime().getDriver(driverIndex);
-        int devs = driver.getDeviceCount();
+        TornadoAcceleratorBackend driver = TornadoCoreRuntime.getTornadoRuntime().getBackend(driverIndex);
+        int devs = driver.getNumDevices();
         int index = 0;
         for (int i = 0; i < devs; i++) {
             if (driver.getDevice(i).getPlatformName().equals(device.getPlatformName()) && (driver.getDevice(i).getDeviceName().equals(device.getDeviceName()))) {
@@ -212,34 +178,20 @@ public abstract class AbstractMetaData implements TaskMetaDataInterface {
      * Set a device in the default driver.
      *
      * @param device
-     *            {@link TornadoDevice}
+     *     {@link TornadoDevice}
      */
     public void setDevice(TornadoDevice device) {
-        this.driverIndex = device.getDriverIndex();
-        this.deviceIndex = getDeviceIndex(driverIndex, device);
-        if (device instanceof TornadoAcceleratorDevice) {
-            this.device = (TornadoAcceleratorDevice) device;
+        this.backendIndex = device.getDriverIndex();
+        this.deviceIndex = getDeviceIndex(backendIndex, device);
+        if (device instanceof TornadoXPUDevice tornadoAcceleratorDevice) {
+            this.device = tornadoAcceleratorDevice;
         }
         deviceManuallySet = true;
     }
 
-    /**
-     * Set a device from a specific Tornado driver.
-     *
-     * @param driverIndex
-     *            Driver Index
-     * @param device
-     *            {@link TornadoAcceleratorDevice}
-     */
-    public void setDriverDevice(int driverIndex, TornadoAcceleratorDevice device) {
-        this.driverIndex = driverIndex;
-        this.deviceIndex = getDeviceIndex(driverIndex, device);
-        this.device = device;
-    }
-
     @Override
-    public int getDriverIndex() {
-        return driverIndex;
+    public int getBackendIndex() {
+        return backendIndex;
     }
 
     @Override
@@ -256,11 +208,11 @@ public abstract class AbstractMetaData implements TaskMetaDataInterface {
     }
 
     public boolean isThreadInfoEnabled() {
-        return threadInfo;
+        return threadInfoEnabled;
     }
 
     public boolean isDebug() {
-        return debug;
+        return debugMode;
     }
 
     public boolean shouldDumpEvents() {
@@ -273,18 +225,6 @@ public abstract class AbstractMetaData implements TaskMetaDataInterface {
 
     public boolean shouldDumpTaskGraph() {
         return dumpTaskGraph;
-    }
-
-    public boolean shouldDebugKernelArgs() {
-        return debugKernelArgs;
-    }
-
-    public boolean shouldPrintCompileTimes() {
-        return printCompileTimes;
-    }
-
-    public boolean shouldPrintKernelExecutionTime() {
-        return printKernelExecutionTime;
     }
 
     public String getCompilerFlags() {
@@ -309,52 +249,12 @@ public abstract class AbstractMetaData implements TaskMetaDataInterface {
         return openclGpuBlock2DY;
     }
 
-    public boolean shouldUseOpenCLRelativeAddresses() {
-        return openclUseRelativeAddresses;
-    }
-
-    public boolean enableOpenCLBifs() {
-        return openclEnableBifs;
-    }
-
     public boolean shouldUseOpenCLDriverScheduling() {
         return openclUseDriverScheduling;
     }
 
-    public boolean shouldUseOpenCLWaitActive() {
-        return openclWaitActive;
-    }
-
-    public boolean shouldUseVmWaitEvent() {
-        return vmWaitEvent;
-    }
-
-    public boolean enableExceptions() {
-        return enableExceptions;
-    }
-
-    public boolean enableProfiling() {
-        return enableProfiling;
-    }
-
-    public boolean enableOooExecution() {
-        return enableOooExecution;
-    }
-
-    public boolean shouldUseOpenCLBlockingApiCalls() {
-        return openclUseBlockingApiCalls;
-    }
-
     public boolean enableParallelization() {
         return enableParallelization;
-    }
-
-    public boolean enableVectors() {
-        return enableVectors;
-    }
-
-    public boolean enableMemChecks() {
-        return enableMemChecks;
     }
 
     public boolean enableThreadCoarsener() {
@@ -400,12 +300,8 @@ public abstract class AbstractMetaData implements TaskMetaDataInterface {
         return isCpuConfigDefined;
     }
 
-    public boolean shouldCoarsenWithCpuConfig() {
-        return coarsenWithCpuConfig;
-    }
-
     @Override
-    public List<TornadoEvents> getProfiles() {
+    public List<TornadoEvents> getProfiles(long executionPlanId) {
         return null;
     }
 
@@ -501,5 +397,47 @@ public abstract class AbstractMetaData implements TaskMetaDataInterface {
 
     public boolean isGridSchedulerEnabled() {
         return this.useGridScheduler;
+    }
+
+    public void enableThreadInfo() {
+        this.threadInfoEnabled = true;
+    }
+
+    public void disableThreadInfo() {
+        this.threadInfoEnabled = false;
+    }
+
+    @Override
+    public boolean isPrintKernelEnabled() {
+        return printKernel;
+    }
+
+    @Override
+    public void setPrintKernelFlag(boolean printKernelEnabled) {
+        this.printKernel = printKernelEnabled;
+    }
+
+    public void enablePrintKernel() {
+        this.printKernel = true;
+    }
+
+    public void disablePrintKernel() {
+        this.printKernel = false;
+    }
+
+    public void setThreadInfoEnabled(boolean threadInfoEnabled) {
+        this.threadInfoEnabled = threadInfoEnabled;
+    }
+
+    public void resetThreadBlocks() {
+        this.resetThreads = true;
+    }
+
+    public boolean shouldResetThreadsBlock() {
+        return this.resetThreads;
+    }
+
+    public void disableResetThreadBlock() {
+        this.resetThreads = false;
     }
 }

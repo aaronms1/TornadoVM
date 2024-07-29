@@ -12,7 +12,7 @@
  *
  * This code is distributed in the hope that it will be useful, but WITHOUT
  * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
- * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License
  * version 2 for more details (a copy is included in the LICENSE file that
  * accompanied this code).
  *
@@ -20,39 +20,47 @@
  * 2 along with this work; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
  *
- * Authors: James Clarkson
- *
  */
 package uk.ac.manchester.tornado.drivers.opencl;
 
 import static uk.ac.manchester.tornado.api.exceptions.TornadoInternalError.guarantee;
 import static uk.ac.manchester.tornado.drivers.opencl.enums.OCLCommandQueueInfo.CL_QUEUE_CONTEXT;
 import static uk.ac.manchester.tornado.drivers.opencl.enums.OCLCommandQueueInfo.CL_QUEUE_DEVICE;
-import static uk.ac.manchester.tornado.runtime.common.Tornado.MARKER_USE_BARRIER;
 
 import java.nio.ByteBuffer;
 
 import uk.ac.manchester.tornado.api.common.Event;
+import uk.ac.manchester.tornado.api.exceptions.TornadoBailoutRuntimeException;
+import uk.ac.manchester.tornado.drivers.common.CommandQueue;
 import uk.ac.manchester.tornado.drivers.opencl.exceptions.OCLException;
 import uk.ac.manchester.tornado.runtime.EmptyEvent;
-import uk.ac.manchester.tornado.runtime.common.Tornado;
 import uk.ac.manchester.tornado.runtime.common.TornadoLogger;
 
-public class OCLCommandQueue extends TornadoLogger {
+public class OCLCommandQueue extends CommandQueue {
 
     protected static final Event EMPTY_EVENT = new EmptyEvent();
+    private TornadoLogger logger = new TornadoLogger(this.getClass());
 
-    private final long commandQueue;
+    private final long commandQueuePtr;
+
+    /**
+     * Small buffer for querying properties regarding the command queue.
+     * This is useful for debugging.
+     */
     private final ByteBuffer buffer;
     private final long properties;
     private final int openclVersion;
 
-    public OCLCommandQueue(long id, long properties, int version) {
-        this.commandQueue = id;
+    public OCLCommandQueue(long commandQueuePtr, long properties, int version) {
+        this.commandQueuePtr = commandQueuePtr;
         this.properties = properties;
         this.buffer = ByteBuffer.allocate(128);
         this.buffer.order(OpenCL.BYTE_ORDER);
         this.openclVersion = version;
+    }
+
+    public long getCommandQueuePtr() {
+        return commandQueuePtr;
     }
 
     static native void clReleaseCommandQueue(long queueId) throws OCLException;
@@ -63,22 +71,22 @@ public class OCLCommandQueue extends TornadoLogger {
      * Dispatch an OpenCL kernel via a JNI call.
      *
      * @param queueId
-     *            OpenCL command queue object
+     *     OpenCL command queue object
      * @param kernelId
-     *            OpenCL kernel ID object
+     *     OpenCL kernel ID object
      * @param dim
-     *            Dimensions of the Kernel (1D, 2D or 3D)
+     *     Dimensions of the Kernel (1D, 2D or 3D)
      * @param global_work_offset
-     *            Offset within global access
+     *     Offset within global access
      * @param global_work_size
-     *            Total number of threads to launch
+     *     Total number of threads to launch
      * @param local_work_size
-     *            Local work group size
+     *     Local work group size
      * @param events
-     *            List of events
+     *     List of events
      * @return Returns an event's ID
      * @throws OCLException
-     *             OpenCL Exception
+     *     OpenCL Exception
      */
     static native long clEnqueueNDRangeKernel(long queueId, long kernelId, int dim, long[] global_work_offset, long[] global_work_size, long[] local_work_size, long[] events) throws OCLException;
 
@@ -96,6 +104,8 @@ public class OCLCommandQueue extends TornadoLogger {
 
     static native long writeArrayToDevice(long queueId, double[] buffer, long hostOffset, boolean blocking, long offset, long bytes, long ptr, long[] events) throws OCLException;
 
+    native static long writeArrayToDevice(long queueId, long hostPointer, long hostOffset, boolean blocking, long offset, long bytes, long ptr, long[] events) throws OCLException;
+
     static native long readArrayFromDevice(long queueId, byte[] buffer, long hostOffset, boolean blocking, long offset, long bytes, long ptr, long[] events) throws OCLException;
 
     static native long readArrayFromDevice(long queueId, char[] buffer, long hostOffset, boolean blocking, long offset, long bytes, long ptr, long[] events) throws OCLException;
@@ -109,6 +119,8 @@ public class OCLCommandQueue extends TornadoLogger {
     static native long readArrayFromDevice(long queueId, float[] buffer, long hostOffset, boolean blocking, long offset, long bytes, long ptr, long[] events) throws OCLException;
 
     static native long readArrayFromDevice(long queueId, double[] buffer, long hostOffset, boolean blocking, long offset, long bytes, long ptr, long[] events) throws OCLException;
+
+    static native long readArrayFromDeviceOffHeap(long queueId, long hostPointer, long hostOffset, boolean blocking, long offset, long bytes, long ptr, long[] events) throws OCLException;
 
     static native void clEnqueueWaitForEvents(long queueId, long[] events) throws OCLException;
 
@@ -125,35 +137,36 @@ public class OCLCommandQueue extends TornadoLogger {
 
     public void flushEvents() {
         try {
-            clFlush(commandQueue);
+            clFlush(commandQueuePtr);
         } catch (OCLException e) {
             e.printStackTrace();
+            throw new TornadoBailoutRuntimeException(e.getMessage());
         }
     }
 
     public long getContextId() {
-        long result = -1;
+        long result;
         buffer.clear();
         try {
-            clGetCommandQueueInfo(commandQueue, CL_QUEUE_CONTEXT.getValue(), buffer.array());
+            clGetCommandQueueInfo(commandQueuePtr, CL_QUEUE_CONTEXT.getValue(), buffer.array());
             result = buffer.getLong();
         } catch (OCLException e) {
-            error(e.getMessage());
+            logger.error(e.getMessage());
+            throw new TornadoBailoutRuntimeException(e.getMessage());
         }
-
         return result;
     }
 
     public long getDeviceId() {
-        long result = -1;
+        long result;
         buffer.clear();
         try {
-            clGetCommandQueueInfo(commandQueue, CL_QUEUE_DEVICE.getValue(), buffer.array());
+            clGetCommandQueueInfo(commandQueuePtr, CL_QUEUE_DEVICE.getValue(), buffer.array());
             result = buffer.getLong();
         } catch (OCLException e) {
-            error(e.getMessage());
+            logger.error(e.getMessage());
+            throw new TornadoBailoutRuntimeException(e.getMessage());
         }
-
         return result;
     }
 
@@ -175,9 +188,10 @@ public class OCLCommandQueue extends TornadoLogger {
 
     public void cleanup() {
         try {
-            clReleaseCommandQueue(commandQueue);
+            clReleaseCommandQueue(commandQueuePtr);
         } catch (OCLException e) {
             e.printStackTrace();
+            throw new TornadoBailoutRuntimeException(e.getMessage());
         }
     }
 
@@ -188,170 +202,187 @@ public class OCLCommandQueue extends TornadoLogger {
 
     public long enqueueNDRangeKernel(OCLKernel kernel, int dim, long[] globalWorkOffset, long[] globalWorkSize, long[] localWorkSize, long[] waitEvents) {
         try {
-            return clEnqueueNDRangeKernel(commandQueue, kernel.getOclKernelID(), dim, (openclVersion > 100) ? globalWorkOffset : null, globalWorkSize, localWorkSize, waitEvents);
+            return clEnqueueNDRangeKernel(commandQueuePtr, kernel.getOclKernelID(), dim, (openclVersion > 100) ? globalWorkOffset : null, globalWorkSize, localWorkSize, waitEvents);
         } catch (OCLException e) {
-            error(e.getMessage());
+            logger.error(e.getMessage());
+            throw new TornadoBailoutRuntimeException(e.getMessage());
         }
-
-        if (Tornado.FORCE_BLOCKING_API_CALLS) {
-            enqueueBarrier();
-        }
-        return -1;
     }
 
     public long enqueueWrite(long devicePtr, boolean blocking, long offset, long bytes, byte[] array, long hostOffset, long[] waitEvents) {
         guarantee(array != null, "null array");
         try {
-            return writeArrayToDevice(commandQueue, array, hostOffset, blocking, offset, bytes, devicePtr, waitEvents);
+            return writeArrayToDevice(commandQueuePtr, array, hostOffset, blocking, offset, bytes, devicePtr, waitEvents);
         } catch (OCLException e) {
-            error(e.getMessage());
+            logger.error(e.getMessage());
+            throw new TornadoBailoutRuntimeException(e.getMessage());
         }
-        return -1;
     }
 
     public long enqueueWrite(long devicePtr, boolean blocking, long offset, long bytes, char[] array, long hostOffset, long[] waitEvents) {
         guarantee(array != null, "null array");
         try {
-            return writeArrayToDevice(commandQueue, array, hostOffset, blocking, offset, bytes, devicePtr, waitEvents);
+            return writeArrayToDevice(commandQueuePtr, array, hostOffset, blocking, offset, bytes, devicePtr, waitEvents);
         } catch (OCLException e) {
-            error(e.getMessage());
+            logger.error(e.getMessage());
+            throw new TornadoBailoutRuntimeException(e.getMessage());
         }
-        return -1;
     }
 
     public long enqueueWrite(long devicePtr, boolean blocking, long offset, long bytes, int[] array, long hostOffset, long[] waitEvents) {
         guarantee(array != null, "null array");
         try {
-            return writeArrayToDevice(commandQueue, array, hostOffset, blocking, offset, bytes, devicePtr, waitEvents);
+            return writeArrayToDevice(commandQueuePtr, array, hostOffset, blocking, offset, bytes, devicePtr, waitEvents);
         } catch (OCLException e) {
-            error(e.getMessage());
+            logger.error(e.getMessage());
+            throw new TornadoBailoutRuntimeException(e.getMessage());
         }
-        return -1;
     }
 
     public long enqueueWrite(long devicePtr, boolean blocking, long offset, long bytes, short[] array, long hostOffset, long[] waitEvents) {
         guarantee(array != null, "null array");
         try {
-            return writeArrayToDevice(commandQueue, array, hostOffset, blocking, offset, bytes, devicePtr, waitEvents);
+            return writeArrayToDevice(commandQueuePtr, array, hostOffset, blocking, offset, bytes, devicePtr, waitEvents);
         } catch (OCLException e) {
-            error(e.getMessage());
+            logger.error(e.getMessage());
+            throw new TornadoBailoutRuntimeException(e.getMessage());
         }
-        return -1;
     }
 
     public long enqueueWrite(long devicePtr, boolean blocking, long offset, long bytes, long[] array, long hostOffset, long[] waitEvents) {
         guarantee(array != null, "null array");
         try {
-            return writeArrayToDevice(commandQueue, array, hostOffset, blocking, offset, bytes, devicePtr, waitEvents);
+            return writeArrayToDevice(commandQueuePtr, array, hostOffset, blocking, offset, bytes, devicePtr, waitEvents);
         } catch (OCLException e) {
-            error(e.getMessage());
+            logger.error(e.getMessage());
+            throw new TornadoBailoutRuntimeException(e.getMessage());
         }
-        return -1;
     }
 
     public long enqueueWrite(long devicePtr, boolean blocking, long offset, long bytes, float[] array, long hostOffset, long[] waitEvents) {
         guarantee(array != null, "null array");
         try {
-            return writeArrayToDevice(commandQueue, array, hostOffset, blocking, offset, bytes, devicePtr, waitEvents);
+            return writeArrayToDevice(commandQueuePtr, array, hostOffset, blocking, offset, bytes, devicePtr, waitEvents);
         } catch (OCLException e) {
-            error(e.getMessage());
+            logger.error(e.getMessage());
+            throw new TornadoBailoutRuntimeException(e.getMessage());
         }
-        return -1;
     }
 
     public long enqueueWrite(long devicePtr, boolean blocking, long offset, long bytes, double[] array, long hostOffset, long[] waitEvents) {
         guarantee(array != null, "null array");
         try {
-            return writeArrayToDevice(commandQueue, array, hostOffset, blocking, offset, bytes, devicePtr, waitEvents);
+            return writeArrayToDevice(commandQueuePtr, array, hostOffset, blocking, offset, bytes, devicePtr, waitEvents);
         } catch (OCLException e) {
-            error(e.getMessage());
+            logger.error(e.getMessage());
+            throw new TornadoBailoutRuntimeException(e.getMessage());
         }
-        return -1;
+    }
+
+    public long enqueueWrite(long devicePtr, boolean blocking, long offset, long bytes, long hostPointer, long hostOffset, long[] waitEvents) {
+        guarantee(hostPointer != 0, "null segment");
+        try {
+            return writeArrayToDevice(commandQueuePtr, hostPointer, hostOffset, blocking, offset, bytes, devicePtr, waitEvents);
+        } catch (OCLException e) {
+            logger.error(e.getMessage());
+            throw new TornadoBailoutRuntimeException(e.getMessage());
+        }
     }
 
     public long enqueueRead(long devicePtr, boolean blocking, long offset, long bytes, byte[] array, long hostOffset, long[] waitEvents) {
         guarantee(array != null, "null array");
         try {
-            return readArrayFromDevice(commandQueue, array, hostOffset, blocking, offset, bytes, devicePtr, waitEvents);
+            return readArrayFromDevice(commandQueuePtr, array, hostOffset, blocking, offset, bytes, devicePtr, waitEvents);
         } catch (OCLException e) {
-            error(e.getMessage());
+            logger.error(e.getMessage());
+            throw new TornadoBailoutRuntimeException(e.getMessage());
         }
-        return -1;
     }
 
     public long enqueueRead(long devicePtr, boolean blocking, long offset, long bytes, char[] array, long hostOffset, long[] waitEvents) {
         guarantee(array != null, "null array");
         try {
-            return readArrayFromDevice(commandQueue, array, hostOffset, blocking, offset, bytes, devicePtr, waitEvents);
+            return readArrayFromDevice(commandQueuePtr, array, hostOffset, blocking, offset, bytes, devicePtr, waitEvents);
         } catch (OCLException e) {
-            error(e.getMessage());
+            logger.error(e.getMessage());
+            throw new TornadoBailoutRuntimeException(e.getMessage());
         }
-        return -1;
     }
 
     public long enqueueRead(long devicePtr, boolean blocking, long offset, long bytes, int[] array, long hostOffset, long[] waitEvents) {
         guarantee(array != null, "null array");
         try {
-            return readArrayFromDevice(commandQueue, array, hostOffset, blocking, offset, bytes, devicePtr, waitEvents);
+            return readArrayFromDevice(commandQueuePtr, array, hostOffset, blocking, offset, bytes, devicePtr, waitEvents);
         } catch (OCLException e) {
-            error(e.getMessage());
+            logger.error(e.getMessage());
+            throw new TornadoBailoutRuntimeException(e.getMessage());
         }
-        return -1;
     }
 
     public long enqueueRead(long devicePtr, boolean blocking, long offset, long bytes, short[] array, long hostOffset, long[] waitEvents) {
         guarantee(array != null, "array is null");
         try {
-            return readArrayFromDevice(commandQueue, array, hostOffset, blocking, offset, bytes, devicePtr, waitEvents);
+            return readArrayFromDevice(commandQueuePtr, array, hostOffset, blocking, offset, bytes, devicePtr, waitEvents);
         } catch (OCLException e) {
-            error(e.getMessage());
+            logger.error(e.getMessage());
+            throw new TornadoBailoutRuntimeException(e.getMessage());
         }
-        return -1;
     }
 
     public long enqueueRead(long devicePtr, boolean blocking, long offset, long bytes, long[] array, long hostOffset, long[] waitEvents) {
         guarantee(array != null, "array is null");
         try {
-            return readArrayFromDevice(commandQueue, array, hostOffset, blocking, offset, bytes, devicePtr, waitEvents);
+            return readArrayFromDevice(commandQueuePtr, array, hostOffset, blocking, offset, bytes, devicePtr, waitEvents);
         } catch (OCLException e) {
-            error(e.getMessage());
+            logger.error(e.getMessage());
+            throw new TornadoBailoutRuntimeException(e.getMessage());
         }
-        return -1;
     }
 
     public long enqueueRead(long devicePtr, boolean blocking, long offset, long bytes, float[] array, long hostOffset, long[] waitEvents) {
         guarantee(array != null, "array is null");
         try {
-            return readArrayFromDevice(commandQueue, array, hostOffset, blocking, offset, bytes, devicePtr, waitEvents);
+            return readArrayFromDevice(commandQueuePtr, array, hostOffset, blocking, offset, bytes, devicePtr, waitEvents);
         } catch (OCLException e) {
-            error(e.getMessage());
+            logger.error(e.getMessage());
+            throw new TornadoBailoutRuntimeException(e.getMessage());
         }
-        return -1;
     }
 
     public long enqueueRead(long devicePtr, boolean blocking, long offset, long bytes, double[] array, long hostOffset, long[] waitEvents) {
         guarantee(array != null, "array is null");
         try {
-            return readArrayFromDevice(commandQueue, array, hostOffset, blocking, offset, bytes, devicePtr, waitEvents);
+            return readArrayFromDevice(commandQueuePtr, array, hostOffset, blocking, offset, bytes, devicePtr, waitEvents);
         } catch (OCLException e) {
-            error(e.getMessage());
+            logger.error(e.getMessage());
+            throw new TornadoBailoutRuntimeException(e.getMessage());
         }
-        return -1;
+    }
+
+    public long enqueueRead(long devicePtr, boolean blocking, long offset, long bytes, long hostPointer, long hostOffset, long[] waitEvents) {
+        guarantee(hostPointer != 0, "segment is null");
+        try {
+            return readArrayFromDeviceOffHeap(commandQueuePtr, hostPointer, hostOffset, blocking, offset, bytes, devicePtr, waitEvents);
+        } catch (OCLException e) {
+            logger.error(e.getMessage());
+            throw new TornadoBailoutRuntimeException(e.getMessage());
+        }
     }
 
     public void finish() {
         try {
-            clFinish(commandQueue);
+            clFinish(commandQueuePtr);
         } catch (OCLException e) {
-            error(e.getMessage());
+            logger.error(e.getMessage());
+            throw new TornadoBailoutRuntimeException(e.getMessage());
         }
     }
 
     public void flush() {
         try {
-            clFlush(commandQueue);
+            clFlush(commandQueuePtr);
         } catch (OCLException e) {
-            error(e.getMessage());
+            throw new TornadoBailoutRuntimeException(e.getMessage());
         }
     }
 
@@ -362,27 +393,25 @@ public class OCLCommandQueue extends TornadoLogger {
     private int enqueueBarrier_OCLv1_1(long[] events) {
         try {
             if (events != null) {
-                clEnqueueWaitForEvents(commandQueue, events);
+                clEnqueueWaitForEvents(commandQueuePtr, events);
             }
         } catch (OCLException e) {
-            fatal(e.getMessage());
+            logger.fatal(e.getMessage());
+            throw new TornadoBailoutRuntimeException(e.getMessage());
         }
-        return -1;
+        return 0;
     }
 
     private long enqueueBarrier_OCLv1_2(long[] waitEvents) {
         try {
-            return clEnqueueBarrierWithWaitList(commandQueue, waitEvents);
+            return clEnqueueBarrierWithWaitList(commandQueuePtr, waitEvents);
         } catch (OCLException e) {
-            fatal(e.getMessage());
+            logger.fatal(e.getMessage());
+            throw new TornadoBailoutRuntimeException(e.getMessage());
         }
-        return -1;
     }
 
     public long enqueueMarker(long[] waitEvents) {
-        if (MARKER_USE_BARRIER) {
-            return enqueueBarrier(waitEvents);
-        }
         return (openclVersion < 120) ? enqueueMarker11(waitEvents) : enqueueMarker12(waitEvents);
     }
 
@@ -392,11 +421,11 @@ public class OCLCommandQueue extends TornadoLogger {
 
     private long enqueueMarker12(long[] waitEvents) {
         try {
-            return clEnqueueMarkerWithWaitList(commandQueue, waitEvents);
+            return clEnqueueMarkerWithWaitList(commandQueuePtr, waitEvents);
         } catch (OCLException e) {
-            fatal(e.getMessage());
+            logger.fatal(e.getMessage());
+            throw new TornadoBailoutRuntimeException(e.getMessage());
         }
-        return -1;
     }
 
     public int getOpenclVersion() {

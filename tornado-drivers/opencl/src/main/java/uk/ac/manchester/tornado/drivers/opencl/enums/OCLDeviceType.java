@@ -1,5 +1,5 @@
 /*
- * This file is part of Tornado: A heterogeneous programming framework: 
+ * This file is part of Tornado: A heterogeneous programming framework:
  * https://github.com/beehive-lab/tornadovm
  *
  * Copyright (c) 2013-2020, APT Group, Department of Computer Science,
@@ -12,15 +12,13 @@
  *
  * This code is distributed in the hope that it will be useful, but WITHOUT
  * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
- * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License
  * version 2 for more details (a copy is included in the LICENSE file that
  * accompanied this code).
  *
  * You should have received a copy of the GNU General Public License version
  * 2 along with this work; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
- *
- * Authors: James Clarkson
  *
  */
 package uk.ac.manchester.tornado.drivers.opencl.enums;
@@ -34,7 +32,7 @@ public enum OCLDeviceType {
 	CL_DEVICE_TYPE_GPU(1 << 2),
 	CL_DEVICE_TYPE_ACCELERATOR(1 << 3),
 	CL_DEVICE_TYPE_CUSTOM(1 << 4),
-	CL_DEVICE_TYPE_ALL(0xFFFFFFFF);
+	CL_DEVICE_TYPE_ALL(0xFFFFFFFFL);
     // @formatter:on
 
     private final long value;
@@ -48,27 +46,14 @@ public enum OCLDeviceType {
     }
 
     public static OCLDeviceType toDeviceType(final long v) {
-        OCLDeviceType result = null;
-        switch ((int) v) {
-            case 1:
-                result = OCLDeviceType.CL_DEVICE_TYPE_DEFAULT;
-                break;
-            case 1 << 1:
-                result = OCLDeviceType.CL_DEVICE_TYPE_CPU;
-                break;
-            case 1 << 2:
-                result = OCLDeviceType.CL_DEVICE_TYPE_GPU;
-                break;
-            case 1 << 3:
-                result = OCLDeviceType.CL_DEVICE_TYPE_ACCELERATOR;
-                break;
-            case 1 << 4:
-                result = OCLDeviceType.CL_DEVICE_TYPE_CUSTOM;
-                break;
-            case 0xFFFFFFFF:
-                result = OCLDeviceType.CL_DEVICE_TYPE_ALL;
-                break;
-        }
-        return result;
+        return switch ((int) v) {
+            case 1 -> OCLDeviceType.CL_DEVICE_TYPE_DEFAULT;
+            case 1 << 1 -> OCLDeviceType.CL_DEVICE_TYPE_CPU;
+            case 1 << 2 -> OCLDeviceType.CL_DEVICE_TYPE_GPU;
+            case 1 << 3 -> OCLDeviceType.CL_DEVICE_TYPE_ACCELERATOR;
+            case 1 << 4 -> OCLDeviceType.CL_DEVICE_TYPE_CUSTOM;
+            case 0xFFFFFFFF -> OCLDeviceType.CL_DEVICE_TYPE_ALL;
+            default -> OCLDeviceType.Unknown;
+        };
     }
 }

@@ -2,7 +2,7 @@
  * This file is part of Tornado: A heterogeneous programming framework:
  * https://github.com/beehive-lab/tornadovm
  *
- * Copyright (c) 2021, APT Group, Department of Computer Science,
+ * Copyright (c) 2021, 2024 APT Group, Department of Computer Science,
  * School of Engineering, The University of Manchester. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
@@ -12,7 +12,7 @@
  *
  * This code is distributed in the hope that it will be useful, but WITHOUT
  * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
- * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License
  * version 2 for more details (a copy is included in the LICENSE file that
  * accompanied this code).
  *
@@ -40,6 +40,7 @@ import uk.ac.manchester.beehivespirvtoolkit.lib.instructions.operands.SPIRVCapab
 import uk.ac.manchester.beehivespirvtoolkit.lib.instructions.operands.SPIRVId;
 import uk.ac.manchester.beehivespirvtoolkit.lib.instructions.operands.SPIRVLiteralInteger;
 import uk.ac.manchester.beehivespirvtoolkit.lib.instructions.operands.SPIRVStorageClass;
+import uk.ac.manchester.tornado.api.exceptions.TornadoRuntimeException;
 import uk.ac.manchester.tornado.drivers.spirv.graal.lir.SPIRVKind;
 
 public class SPIRVPrimitiveTypes {
@@ -70,8 +71,8 @@ public class SPIRVPrimitiveTypes {
 
     private SPIRVId getVectorType(SPIRVKind vectorType, SPIRVId typeID) {
         SPIRVId intPrimitiveId = getTypePrimitive(vectorType.getElementKind());
-        if (vectorType.getVectorLength() == 8 && !vector16Capability) {
-            // Having 8 components for TypeVector requires the Vector16 capability
+        if ((vectorType.getVectorLength() == 8 || vectorType.getVectorLength() == 16) && !vector16Capability) {
+            // Having 8 or 16 components for TypeVector requires the Vector16 capability
             module.add(new SPIRVOpCapability(SPIRVCapability.Vector16()));
             vector16Capability = true;
         }
@@ -118,6 +119,7 @@ public class SPIRVPrimitiveTypes {
                     break;
                 case OP_TYPE_FLOAT_16:
                     if (!capabilities.contains(primitive)) {
+                        module.add(new SPIRVOpCapability(SPIRVCapability.Float16Buffer()));
                         module.add(new SPIRVOpCapability(SPIRVCapability.Float16()));
                     }
                     module.add(new SPIRVOpTypeFloat(typeID, new SPIRVLiteralInteger(sizeInBytes)));
@@ -132,7 +134,7 @@ public class SPIRVPrimitiveTypes {
                     module.add(new SPIRVOpTypeFloat(typeID, new SPIRVLiteralInteger(sizeInBytes)));
                     break;
                 default:
-                    throw new RuntimeException("DataType Not supported yet");
+                    throw new TornadoRuntimeException("DataType Not supported yet");
             }
             primitives.put(primitive, typeID);
         }

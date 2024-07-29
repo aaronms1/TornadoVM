@@ -6,7 +6,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *    http://www.apache.org/licenses/LICENSE-2.0
+ * http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -29,6 +29,8 @@ import uk.ac.manchester.tornado.api.TaskGraph;
 import uk.ac.manchester.tornado.api.TornadoExecutionPlan;
 import uk.ac.manchester.tornado.api.annotations.Parallel;
 import uk.ac.manchester.tornado.api.enums.DataTransferMode;
+import uk.ac.manchester.tornado.api.exceptions.TornadoExecutionPlanException;
+import uk.ac.manchester.tornado.api.types.arrays.FloatArray;
 import uk.ac.manchester.tornado.unittests.common.TornadoTestBase;
 
 /**
@@ -36,33 +38,32 @@ import uk.ac.manchester.tornado.unittests.common.TornadoTestBase;
  * How to test?
  * </p>
  * <code>
- *     tornado-test -V uk.ac.manchester.tornado.unittests.flatmap.TestFlatMap
+ * tornado-test -V uk.ac.manchester.tornado.unittests.flatmap.TestFlatMap
  * </code>
  */
 public class TestFlatMap extends TornadoTestBase {
 
     private static final int SIZE = 256;
 
-    private static void computeFlatMap(float[] input, float[] output, final int size) {
+    private static void computeFlatMap(FloatArray input, FloatArray output, final int size) {
         for (@Parallel int i = 0; i < size; i++) {
-            if (input[i] > 100) {
+            if (input.get(i) > 100) {
                 for (int j = 0; j < size; j++) {
-                    output[i * size + j] = input[i] + j;
+                    output.set(i * size + j, input.get(i) + j);
                 }
             }
         }
     }
 
     @Test
-    public void testFlatMap() {
-
-        float[] input = new float[SIZE * SIZE];
-        float[] output = new float[SIZE * SIZE];
-        float[] seq = new float[SIZE * SIZE];
+    public void testFlatMap() throws TornadoExecutionPlanException {
+        FloatArray input = new FloatArray(SIZE * SIZE);
+        FloatArray output = new FloatArray(SIZE * SIZE);
+        FloatArray seq = new FloatArray(SIZE * SIZE);
 
         Random r = new Random();
-        IntStream.range(0, input.length).forEach(i -> {
-            input[i] = 50 + r.nextInt(100);
+        IntStream.range(0, input.getSize()).forEach(i -> {
+            input.set(i, 50 + r.nextInt(100));
         });
 
         TaskGraph taskGraph = new TaskGraph("s0") //
@@ -71,13 +72,13 @@ public class TestFlatMap extends TornadoTestBase {
                 .transferToHost(DataTransferMode.EVERY_EXECUTION, output);
 
         ImmutableTaskGraph immutableTaskGraph = taskGraph.snapshot();
-        TornadoExecutionPlan executionPlan = new TornadoExecutionPlan(immutableTaskGraph);
-        executionPlan.execute();
-
+        try (TornadoExecutionPlan executionPlan = new TornadoExecutionPlan(immutableTaskGraph)) {
+            executionPlan.execute();
+        }
         computeFlatMap(input, seq, SIZE);
 
-        for (int i = 0; i < input.length; i++) {
-            assertEquals(seq[i], output[i], 0.001f);
+        for (int i = 0; i < input.getSize(); i++) {
+            assertEquals(seq.get(i), output.get(i), 0.001f);
         }
 
     }

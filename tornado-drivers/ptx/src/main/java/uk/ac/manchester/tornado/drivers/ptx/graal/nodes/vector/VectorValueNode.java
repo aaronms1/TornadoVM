@@ -10,7 +10,7 @@
  *
  * This code is distributed in the hope that it will be useful, but WITHOUT
  * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
- * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License
  * version 2 for more details (a copy is included in the LICENSE file that
  * accompanied this code).
  *
@@ -53,20 +53,17 @@ import uk.ac.manchester.tornado.drivers.ptx.graal.lir.PTXKind;
 import uk.ac.manchester.tornado.drivers.ptx.graal.lir.PTXLIROp;
 import uk.ac.manchester.tornado.drivers.ptx.graal.lir.PTXLIRStmt;
 import uk.ac.manchester.tornado.drivers.ptx.graal.lir.PTXVectorAssign;
-import uk.ac.manchester.tornado.runtime.graal.phases.MarkVectorValueNode;
+import uk.ac.manchester.tornado.runtime.graal.nodes.interfaces.MarkVectorValueNode;
 
 @NodeInfo(nameTemplate = "{p#kind/s}")
 public class VectorValueNode extends FloatingNode implements LIRLowerable, MarkVectorValueNode {
 
     public static final NodeClass<VectorValueNode> TYPE = NodeClass.create(VectorValueNode.class);
-
-    @OptionalInput(InputType.Association)
-    private ValueNode origin;
-
+    private final PTXKind kind;
     @Input
     NodeInputList<ValueNode> values;
-
-    private final PTXKind kind;
+    @OptionalInput(InputType.Association)
+    private ValueNode origin;
 
     public VectorValueNode(PTXKind kind) {
         super(TYPE, PTXStampFactory.getStampFor(kind));
@@ -152,6 +149,7 @@ public class VectorValueNode extends FloatingNode implements LIRLowerable, MarkV
         } else if (origin instanceof ParameterNode) {
             gen.setResult(this, gen.operand(origin));
         } else if (origin == null) {
+
             final AllocatableValue result = tool.newVariable(LIRKind.value(getPTXKind()));
 
             /*
@@ -169,18 +167,29 @@ public class VectorValueNode extends FloatingNode implements LIRLowerable, MarkV
             } else {
                 gen.setResult(this, result);
             }
+
         }
     }
 
     private Value getParam(NodeLIRBuilderTool gen, LIRGeneratorTool tool, int index) {
         final ValueNode valueNode = values.get(index);
+        if ((valueNode instanceof VectorLoadElementNode || valueNode instanceof VectorAddHalfNode) && kind.isHalf()) {
+            return emitHalfFloatAssign(valueNode, tool, gen);
+        }
         return (valueNode == null) ? new ConstantValue(LIRKind.value(kind), JavaConstant.defaultForKind(kind.getElementKind().asJavaKind())) : tool.emitMove(gen.operand(valueNode));
+    }
+
+    private Variable emitHalfFloatAssign(ValueNode vectorValue, LIRGeneratorTool tool, NodeLIRBuilderTool gen) {
+        Variable result = tool.newVariable(LIRKind.value(PTXKind.B16));
+        Value vectorField = gen.operand(vectorValue);
+        tool.emitMove(result, vectorField);
+        return result;
     }
 
     private void generateVectorAssign(NodeLIRBuilderTool gen, LIRGeneratorTool tool, AllocatableValue result) {
 
         PTXLIROp assignExpr = null;
-        Value s0,s1,s2,s3,s4,s5,s6,s7;
+        Value s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15;
 
         // check if first parameter is a vector
         s0 = getParam(gen, tool, 0);
@@ -219,6 +228,25 @@ public class VectorValueNode extends FloatingNode implements LIRLowerable, MarkV
                 s6 = getParam(gen, tool, 6);
                 s7 = getParam(gen, tool, 7);
                 assignExpr = new PTXVectorAssign.AssignVectorExpr(getPTXKind(), s0, s1, s2, s3, s4, s5, s6, s7);
+                break;
+            }
+            case 16: {
+                s1 = getParam(gen, tool, 1);
+                s2 = getParam(gen, tool, 2);
+                s3 = getParam(gen, tool, 3);
+                s4 = getParam(gen, tool, 4);
+                s5 = getParam(gen, tool, 5);
+                s6 = getParam(gen, tool, 6);
+                s7 = getParam(gen, tool, 7);
+                s8 = getParam(gen, tool, 8);
+                s9 = getParam(gen, tool, 9);
+                s10 = getParam(gen, tool, 10);
+                s11 = getParam(gen, tool, 11);
+                s12 = getParam(gen, tool, 12);
+                s13 = getParam(gen, tool, 13);
+                s14 = getParam(gen, tool, 14);
+                s15 = getParam(gen, tool, 15);
+                assignExpr = new PTXVectorAssign.AssignVectorExpr(getPTXKind(), s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15);
                 break;
             }
             default:

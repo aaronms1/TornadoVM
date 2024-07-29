@@ -10,15 +10,13 @@
  *
  * This code is distributed in the hope that it will be useful, but WITHOUT
  * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
- * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License
  * version 2 for more details (a copy is included in the LICENSE file that
  * accompanied this code).
  *
  * You should have received a copy of the GNU General Public License version
  * 2 along with this work; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
- *
- * Authors: James Clarkson
  *
  */
 package uk.ac.manchester.tornado.drivers.opencl;
@@ -56,6 +54,8 @@ public class OCLTargetDescription extends TargetDescription {
     private final String extensions;
     private final boolean supportsInt64Atomics;
 
+    private final boolean supportsF16;
+
     public OCLTargetDescription(Architecture arch, boolean supportsFP64, String extensions) {
         this(arch, false, STACK_ALIGNMENT, IMPLICIT_NULL_CHECK_LIMIT, INLINE_OBJECTS, supportsFP64, extensions);
     }
@@ -65,10 +65,11 @@ public class OCLTargetDescription extends TargetDescription {
         this.supportsFP64 = supportsFP64;
         this.extensions = extensions;
         supportsInt64Atomics = extensions.contains("cl_khr_int64_base_atomics");
+        supportsF16 = extensions.contains("cl_khr_fp16");
     }
     //@formatter:on
 
-    private static int lookupLengthIndex(int vectorLength) {
+    private int lookupLengthIndex(int vectorLength) {
         switch (vectorLength) {
             case 2:
                 return 0;
@@ -92,6 +93,10 @@ public class OCLTargetDescription extends TargetDescription {
 
     public boolean supportsFP64() {
         return supportsFP64;
+    }
+
+    public boolean supportsFP16() {
+        return supportsF16;
     }
 
     public boolean supportsInt64Atomics() {

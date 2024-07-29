@@ -12,7 +12,7 @@
  *
  * This code is distributed in the hope that it will be useful, but WITHOUT
  * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
- * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License
  * version 2 for more details (a copy is included in the LICENSE file that
  * accompanied this code).
  *
@@ -24,7 +24,6 @@
 package uk.ac.manchester.tornado.drivers.ptx;
 
 import static uk.ac.manchester.tornado.api.exceptions.TornadoInternalError.guarantee;
-import static uk.ac.manchester.tornado.runtime.common.Tornado.fatal;
 import static uk.ac.manchester.tornado.runtime.common.TornadoOptions.CIRCULAR_EVENTS;
 
 import java.util.ArrayList;
@@ -33,7 +32,8 @@ import java.util.BitSet;
 import java.util.List;
 
 import uk.ac.manchester.tornado.api.exceptions.TornadoBailoutRuntimeException;
-import uk.ac.manchester.tornado.drivers.common.EventDescriptor;
+import uk.ac.manchester.tornado.drivers.common.utils.EventDescriptor;
+import uk.ac.manchester.tornado.runtime.common.TornadoLogger;
 
 public class PTXEventPool {
 
@@ -58,13 +58,14 @@ public class PTXEventPool {
         guarantee(!retain.get(currentEvent), "overwriting retained event");
 
         if (eventWrapper == null) {
-            fatal("invalid event: description=%s\n", descriptorId.getNameDescription());
-            fatal("terminating application as system integrity has been compromised.");
+            TornadoLogger logger = new TornadoLogger();
+            logger.fatal("invalid event: description=%s\n", descriptorId.getNameDescription());
+            logger.fatal("terminating application as system integrity has been compromised.");
             throw new TornadoBailoutRuntimeException("[ERROR] NULL event received from the CUDA driver !");
         }
 
         if (events[currentEvent] != null && !retain.get(currentEvent)) {
-            events[currentEvent].waitForEvents();
+            events[currentEvent].waitForEvents(0);
             events[currentEvent].destroy();
             events[currentEvent] = null;
         }

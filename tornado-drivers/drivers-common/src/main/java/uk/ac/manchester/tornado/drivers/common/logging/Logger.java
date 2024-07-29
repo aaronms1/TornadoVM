@@ -12,7 +12,7 @@
  *
  * This code is distributed in the hope that it will be useful, but WITHOUT
  * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
- * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License
  * version 2 for more details (a copy is included in the LICENSE file that
  * accompanied this code).
  *
@@ -23,7 +23,7 @@
  */
 package uk.ac.manchester.tornado.drivers.common.logging;
 
-import uk.ac.manchester.tornado.drivers.common.Colour;
+import uk.ac.manchester.tornado.drivers.common.utils.Colour;
 import uk.ac.manchester.tornado.runtime.common.TornadoOptions;
 
 /**
@@ -32,32 +32,15 @@ import uk.ac.manchester.tornado.runtime.common.TornadoOptions;
  */
 public class Logger {
 
-    public enum BACKEND {
-
-        OpenCL("OpenCL"), //
-        PTX("PTX"), //
-        SPIRV("SPIRV");//
-
-        String backendName;
-
-        BACKEND(String name) {
-            this.backendName = name;
-        }
-
-        public String backendName() {
-            return this.backendName;
-        }
-    }
-
     /**
-     * Method to track the code generation
+     * Method to track the code generation.
      *
      * @param backend
-     *            Backend selection
+     *     Backend selection
      * @param message
-     *            String message with code gen trace
+     *     String message with code gen trace
      * @param args
-     *            Arguments to the string message
+     *     Arguments to the string message
      */
     public static void traceCodeGen(final BACKEND backend, final String message, final Object... args) {
         if (TornadoOptions.TRACE_CODE_GEN) {
@@ -67,14 +50,14 @@ public class Logger {
 
     /**
      * Method to track SPIR-V IR Builder (from last IR phase to IR Builder for
-     * codegen)
+     * codegen).
      *
      * @param backend
-     *            Backend selection
+     *     Backend selection
      * @param message
-     *            String message with the IR Builder
+     *     String message with the IR Builder
      * @param args
-     *            Arguments to the string message
+     *     Arguments to the string message
      */
     public static void traceBuildLIR(final BACKEND backend, String message, final Object... args) {
         if (TornadoOptions.TRACE_BUILD_LIR) {
@@ -85,15 +68,32 @@ public class Logger {
     /**
      * Method to track internal calls in the TornadoVM Runtime for running the
      * SPIR-V code.
-     * 
+     *
      * @param backend
-     *            Backend selection
+     *     Backend selection
      * @param message
-     *            String track message
+     *     String track message
      * @param args
-     *            Arguments to the string.
+     *     Arguments to the string.
      */
     public static void traceRuntime(final BACKEND backend, String message, final Object... args) {
         System.out.printf(Colour.YELLOW + "[" + backend.backendName() + "-Runtime] " + message + Colour.RESET + "\n", args);
+    }
+
+    public enum BACKEND {
+
+        OpenCL("OpenCL"), //
+        PTX("PTX"), //
+        SPIRV("SPIRV"); //
+
+        String backendName;
+
+        BACKEND(String name) {
+            this.backendName = name;
+        }
+
+        public String backendName() {
+            return this.backendName;
+        }
     }
 }

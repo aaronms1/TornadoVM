@@ -12,7 +12,7 @@
  *
  * This code is distributed in the hope that it will be useful, but WITHOUT
  * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
- * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License
  * version 2 for more details (a copy is included in the LICENSE file that
  * accompanied this code).
  *
@@ -47,9 +47,9 @@ import jdk.vm.ci.hotspot.HotSpotJVMCIRuntime;
 import jdk.vm.ci.hotspot.HotSpotMetaAccessProvider;
 import jdk.vm.ci.meta.JavaKind;
 import jdk.vm.ci.runtime.JVMCIBackend;
-import uk.ac.manchester.tornado.drivers.graal.TornadoMetaAccessExtensionProvider;
-import uk.ac.manchester.tornado.drivers.graal.TornadoPlatformConfigurationProvider;
-import uk.ac.manchester.tornado.drivers.graal.TornadoWordTypes;
+import uk.ac.manchester.tornado.drivers.providers.TornadoMetaAccessExtensionProvider;
+import uk.ac.manchester.tornado.drivers.providers.TornadoPlatformConfigurationProvider;
+import uk.ac.manchester.tornado.drivers.providers.TornadoWordTypes;
 import uk.ac.manchester.tornado.drivers.ptx.PTXDevice;
 import uk.ac.manchester.tornado.drivers.ptx.PTXDeviceContext;
 import uk.ac.manchester.tornado.drivers.ptx.PTXTargetDescription;
@@ -58,7 +58,7 @@ import uk.ac.manchester.tornado.drivers.ptx.graal.compiler.PTXCompilerConfigurat
 import uk.ac.manchester.tornado.drivers.ptx.graal.compiler.plugins.PTXGraphBuilderPlugins;
 import uk.ac.manchester.tornado.drivers.ptx.graal.lir.PTXAddressLowering;
 import uk.ac.manchester.tornado.drivers.ptx.graal.lir.PTXKind;
-import uk.ac.manchester.tornado.runtime.TornadoVMConfig;
+import uk.ac.manchester.tornado.runtime.TornadoVMConfigAccess;
 import uk.ac.manchester.tornado.runtime.graal.DummySnippetFactory;
 import uk.ac.manchester.tornado.runtime.graal.compiler.TornadoConstantFieldProvider;
 import uk.ac.manchester.tornado.runtime.graal.compiler.TornadoForeignCallsProvider;
@@ -74,7 +74,7 @@ public class PTXHotSpotBackendFactory {
     private static final PTXCompilerConfiguration compilerConfiguration = new PTXCompilerConfiguration();
     private static final PTXAddressLowering addressLowering = new PTXAddressLowering();
 
-    public static PTXBackend createJITCompiler(OptionValues options, HotSpotJVMCIRuntime jvmciRuntime, TornadoVMConfig vmConfig, PTXDevice device) {
+    public static PTXBackend createJITCompiler(OptionValues options, HotSpotJVMCIRuntime jvmciRuntime, TornadoVMConfigAccess vmConfig, PTXDevice device) {
         JVMCIBackend jvmci = jvmciRuntime.getHostJVMCIBackend();
         HotSpotMetaAccessProvider metaAccess = (HotSpotMetaAccessProvider) jvmci.getMetaAccess();
         HotSpotConstantReflectionProvider constantReflection = (HotSpotConstantReflectionProvider) jvmci.getConstantReflection();

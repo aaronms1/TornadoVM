@@ -12,7 +12,7 @@
  *
  * This code is distributed in the hope that it will be useful, but WITHOUT
  * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
- * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License
  * version 2 for more details (a copy is included in the LICENSE file that
  * accompanied this code).
  *
@@ -77,6 +77,11 @@ public class EmptyProfiler implements TornadoProfiler {
     }
 
     @Override
+    public long getSize(ProfilerType type) {
+        return 0;
+    }
+
+    @Override
     public synchronized long getTaskTimer(ProfilerType type, String taskName) {
         return 0;
     }
@@ -91,12 +96,12 @@ public class EmptyProfiler implements TornadoProfiler {
     }
 
     @Override
-    public synchronized String createJson(StringBuffer json, String sectionName) {
+    public synchronized String createJson(StringBuilder json, String sectionName) {
         return null;
     }
 
     @Override
-    public synchronized void dumpJson(StringBuffer stringBuffer, String id) {
+    public synchronized void dumpJson(StringBuilder stringBuffer, String id) {
     }
 
     @Override
@@ -104,7 +109,11 @@ public class EmptyProfiler implements TornadoProfiler {
     }
 
     @Override
-    public synchronized void setTaskTimer(ProfilerType totalKernelTime, String taskId, long timer) {
+    public synchronized void setTaskTimer(ProfilerType type, String taskId, long timer) {
+    }
+
+    @Override
+    public void setTaskPowerUsage(ProfilerType type, String taskId, long power) {
     }
 
     @Override

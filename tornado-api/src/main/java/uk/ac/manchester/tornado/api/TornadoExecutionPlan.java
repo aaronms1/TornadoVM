@@ -1,42 +1,18 @@
 /*
- * This file is part of Tornado: A heterogeneous programming framework:
- * https://github.com/beehive-lab/tornadovm
+ * Copyright (c) 2013-2024, APT Group, Department of Computer Science,
+ * The University of Manchester.
  *
- * Copyright (c) 2023, APT Group, Department of Computer Science,
- * The University of Manchester. All rights reserved.
- * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
  *
- * GNU Classpath is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2, or (at your option)
- * any later version.
+ * http://www.apache.org/licenses/LICENSE-2.0
  *
- * GNU Classpath is distributed in the hope that it will be useful, but
- * WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- * General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with GNU Classpath; see the file COPYING.  If not, write to the
- * Free Software Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
- * 02110-1301 USA.
- *
- * Linking this library statically or dynamically with other modules is
- * making a combined work based on this library.  Thus, the terms and
- * conditions of the GNU General Public License cover the whole
- * combination.
- *
- * As a special exception, the copyright holders of this library give you
- * permission to link this library with independent modules to produce an
- * executable, regardless of the license terms of these independent
- * modules, and to copy and distribute the resulting executable under
- * terms of your choice, provided that you also meet, for each linked
- * independent module, the terms and conditions of the license of that
- * module.  An independent module is a module which is not derived from
- * or based on this library.  If you modify this library, you may extend
- * this exception to your version of the library, but you are not
- * obligated to do so.  If you do not wish to do so, delete this
- * exception statement from your version.
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  *
  */
 package uk.ac.manchester.tornado.api;
@@ -44,12 +20,15 @@ package uk.ac.manchester.tornado.api;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Collectors;
 
 import uk.ac.manchester.tornado.api.common.TornadoDevice;
 import uk.ac.manchester.tornado.api.enums.ProfilerMode;
+import uk.ac.manchester.tornado.api.exceptions.TornadoExecutionPlanException;
 import uk.ac.manchester.tornado.api.exceptions.TornadoRuntimeException;
-import uk.ac.manchester.tornado.api.runtime.TornadoRuntime;
+import uk.ac.manchester.tornado.api.runtime.ExecutorFrame;
+import uk.ac.manchester.tornado.api.runtime.TornadoRuntimeProvider;
 
 /**
  * Object to create and optimize an execution plan for running a set of
@@ -58,40 +37,22 @@ import uk.ac.manchester.tornado.api.runtime.TornadoRuntime;
  * execution plan affect to all the immutable graphs associated with it.
  *
  * @since TornadoVM-0.15
- *
  */
-public class TornadoExecutionPlan {
+public class TornadoExecutionPlan implements AutoCloseable {
 
     /**
      * Method to obtain the default device in TornadoVM. The default one corresponds
      * to the device assigned to the driver (backend) with index 0 and device 0.
      */
-    public static TornadoDevice DEFAULT_DEVICE = TornadoRuntime.getTornadoRuntime().getDefaultDevice();
-
-    /**
-     * Method to obtain a specific device using the driver index (backend index) and
-     * device index.
-     *
-     * @param driverIndex
-     *            Integer value that identifies the backend to be used.
-     * @param deviceIndex
-     *            Integer value that identifies the device within the backend to be
-     *            used.
-     * @return {@link TornadoDevice}
-     */
-    public static TornadoDevice getDevice(int driverIndex, int deviceIndex) {
-        return TornadoRuntime.getTornadoRuntime().getDriver(driverIndex).getDevice(deviceIndex);
-    }
-
+    public static TornadoDevice DEFAULT_DEVICE = TornadoRuntimeProvider.getTornadoRuntime().getDefaultDevice();
     private final TornadoExecutor tornadoExecutor;
 
-    private GridScheduler gridScheduler;
-
-    private Policy policy = null;
-
-    private DRMode dynamicReconfigurationMode;
     private ProfilerMode profilerMode;
     private boolean disableProfiler;
+
+    private static final AtomicLong globalExecutionPlanCounter = new AtomicLong(0);
+
+    private final ExecutorFrame executionPackage;
 
     /**
      * Create an Execution Plan: Object to create and optimize an execution plan for
@@ -101,10 +62,41 @@ public class TornadoExecutionPlan {
      * associated with it.
      *
      * @param immutableTaskGraphs
-     *            {@link ImmutableTaskGraph}
+     *     {@link ImmutableTaskGraph}
      */
     public TornadoExecutionPlan(ImmutableTaskGraph... immutableTaskGraphs) {
         this.tornadoExecutor = new TornadoExecutor(immutableTaskGraphs);
+        long id = globalExecutionPlanCounter.incrementAndGet();
+        executionPackage = new ExecutorFrame(id);
+    }
+
+    /**
+     * Method to obtain a specific device using the driver index (backend index) and
+     * device index.
+     *
+     * @param driverIndex
+     *     Integer value that identifies the backend to be used.
+     * @param deviceIndex
+     *     Integer value that identifies the device within the backend to be
+     *     used.
+     * @return {@link TornadoDevice}
+     *
+     */
+    public static TornadoDevice getDevice(int driverIndex, int deviceIndex) {
+        return TornadoRuntimeProvider.getTornadoRuntime().getBackend(driverIndex).getDevice(deviceIndex);
+    }
+
+    public static int getTotalPlans() {
+        return globalExecutionPlanCounter.intValue();
+    }
+
+    /**
+     * Return a data structure that contains all drivers and devices that the TornadoVM Runtime can access.
+     * 
+     * @return {@link TornadoDeviceMap}
+     */
+    public static TornadoDeviceMap getTornadoDeviceMap() {
+        return new TornadoDeviceMap();
     }
 
     /**
@@ -115,16 +107,8 @@ public class TornadoExecutionPlan {
      * @return {@link TornadoExecutionPlan}
      */
     public TornadoExecutionResult execute() {
-
         checkProfilerEnabled();
-
-        if (this.policy != null) {
-            tornadoExecutor.executeWithDynamicReconfiguration(this.policy, this.dynamicReconfigurationMode);
-        } else if (gridScheduler != null) {
-            tornadoExecutor.execute(gridScheduler);
-        } else {
-            tornadoExecutor.execute();
-        }
+        tornadoExecutor.execute(executionPackage);
         return new TornadoExecutionResult(new TornadoProfilerResult(tornadoExecutor));
     }
 
@@ -160,12 +144,53 @@ public class TornadoExecutionPlan {
     }
 
     /**
+     * It selects a specific device for one particular task of the task-graph.
+     *
+     * @param taskName
+     *     The task-name is identified by the task-graph name followed by a dot (".") and
+     *     the task name. For example: "graph.task1".
+     * @param device
+     *     The device is an instance of a {@link TornadoDevice}
+     *
+     * @return {@link TornadoExecutionPlan}
+     */
+    public TornadoExecutionPlan withDevice(String taskName, TornadoDevice device) {
+        tornadoExecutor.setDevice(taskName, device);
+        return this;
+    }
+
+    /**
+     * It enables multiple tasks in a task graph to run concurrently on the same
+     * or different devices. Note that the TornadoVM runtime does not check for
+     * data dependencies across tasks when using this API call. Thus, it is
+     * the responsibility of the programmer to provide tasks with no data dependencies
+     * when invoking the method {@link TornadoExecutionPlan#withConcurrentDevices()}.
+     *
+     * @return {@link TornadoExecutionPlan}
+     */
+    public TornadoExecutionPlan withConcurrentDevices() {
+        tornadoExecutor.withConcurrentDevices();
+        return this;
+    }
+
+    /**
+     * It disables multiple tasks in a task graph to run concurrently on the same
+     * or different devices.
+     *
+     * @return {@link TornadoExecutionPlan}
+     */
+    public TornadoExecutionPlan withoutConcurrentDevices() {
+        tornadoExecutor.withoutConcurrentDevices();
+        return this;
+    }
+
+    /**
      * It obtains the device for a specific immutable task-graph. Note that,
      * ideally, different task immutable task-graph could be executed on different
      * devices.
      *
      * @param immutableTaskGraphIndex
-     *            Index of a specific immutable task-graph
+     *     Index of a specific immutable task-graph
      * @return {@link TornadoExecutionPlan}
      */
     public TornadoDevice getDevice(int immutableTaskGraphIndex) {
@@ -196,21 +221,21 @@ public class TornadoExecutionPlan {
      * can specify all workers for each task-graph.
      *
      * @param gridScheduler
-     *            {@link GridScheduler}
+     *     {@link GridScheduler}
      * @return {@link TornadoExecutionPlan}
      */
     public TornadoExecutionPlan withGridScheduler(GridScheduler gridScheduler) {
-        this.gridScheduler = gridScheduler;
+        tornadoExecutor.withGridScheduler(gridScheduler);
         return this;
     }
 
     /**
-     * Notify the TornadoVM runtime that utilizes the default thread scheduler.
+     * Notify the TornadoVM runtime system to utilize the default thread scheduler.
      *
      * @return {@link TornadoExecutionPlan}
      */
     public TornadoExecutionPlan withDefaultScheduler() {
-        tornadoExecutor.useDefaultScheduler(true);
+        tornadoExecutor.withDefaultScheduler();
         return this;
     }
 
@@ -219,14 +244,13 @@ public class TornadoExecutionPlan {
      * visible devices.
      *
      * @param policy
-     *            {@link Policy}
+     *     {@link Policy}
      * @param mode
-     *            {@link DRMode}
+     *     {@link DRMode}
      * @return {@link TornadoExecutionPlan}
      */
     public TornadoExecutionPlan withDynamicReconfiguration(Policy policy, DRMode mode) {
-        this.policy = policy;
-        this.dynamicReconfigurationMode = mode;
+        executionPackage.withPolicy(policy).withMode(mode);
         return this;
     }
 
@@ -237,7 +261,7 @@ public class TornadoExecutionPlan {
      * global memory.
      *
      * @param batchSize
-     *            String in the format a number + "MB" Example "512MB".
+     *     String in the format a number + "MB" Example "512MB".
      * @return {@link TornadoExecutionPlan}
      */
     public TornadoExecutionPlan withBatch(String batchSize) {
@@ -248,10 +272,10 @@ public class TornadoExecutionPlan {
     /**
      * Enables the profiler. The profiler includes options to query device kernel
      * time, data transfers and compilation at different stages (JIT, driver
-     * compilation, Graal, etc).
+     * compilation, Graal, etc.).
      *
      * @param profilerMode
-     *            {@link ProfilerMode}
+     *     {@link ProfilerMode}
      * @return {@link TornadoExecutionPlan}
      */
     public TornadoExecutionPlan withProfiler(ProfilerMode profilerMode) {
@@ -271,6 +295,37 @@ public class TornadoExecutionPlan {
     }
 
     /**
+     * This method sets a limit to the amount of memory used on the target
+     * hardware accelerator. The TornadoVM runtime will check that the
+     * current instance of the {@link TornadoExecutionPlan} does not exceed
+     * the limit that was specified.
+     *
+     * @param memoryLimit
+     *     Specify the limit in a string format. E.g., "1GB", "512MB".
+     *
+     * @return {@link TornadoExecutionPlan}
+     */
+    public TornadoExecutionPlan withMemoryLimit(String memoryLimit) {
+        tornadoExecutor.withMemoryLimit(memoryLimit);
+        return this;
+    }
+
+    /**
+     * It disables the memory limit for the current instance of an
+     * {@link TornadoExecutionPlan}. This is the default action.
+     * If the memory limit is not set, then the maximum memory to use
+     * is set to the maximum buffer allocation (e.g., 1/4 of the total
+     * capacity using the OpenCL backend), or the maximum memory available
+     * on the target device.
+     *
+     * @return {@link TornadoExecutionPlan}
+     */
+    public TornadoExecutionPlan withoutMemoryLimit() {
+        tornadoExecutor.withoutMemoryLimit();
+        return this;
+    }
+
+    /**
      * Reset the execution context for the current execution plan. The TornadoVM
      * runtime system will clean the code cache and all events associated with the
      * current execution. It resets the internal GPU/FPGA/CPU execution context to
@@ -284,6 +339,20 @@ public class TornadoExecutionPlan {
     }
 
     /**
+     * Obtains the ID that was assigned to the execution plan.
+     */
+    public long getId() {
+        return executionPackage.getExecutionPlanId();
+    }
+
+    /**
+     * Obtains the total number of execution plans instantiated in a TornadoVM application.
+     */
+    public long getGlobalExecutionPlansCounter() {
+        return globalExecutionPlanCounter.get();
+    }
+
+    /**
      * Clean all events associated with previous executions.
      *
      * @return {@link TornadoExecutionPlan}
@@ -293,25 +362,56 @@ public class TornadoExecutionPlan {
         return this;
     }
 
+    public TornadoExecutionPlan withThreadInfo() {
+        tornadoExecutor.withThreadInfo();
+        return this;
+    }
+
+    public TornadoExecutionPlan withoutThreadInfo() {
+        tornadoExecutor.withoutThreadInfo();
+        return this;
+    }
+
+    public TornadoExecutionPlan withPrintKernel() {
+        tornadoExecutor.withPrintKernel();
+        return this;
+    }
+
+    public TornadoExecutionPlan withoutPrintKernel() {
+        tornadoExecutor.withoutPrintKernel();
+        return this;
+    }
+
+    @Override
+    public void close() throws TornadoExecutionPlanException {
+        tornadoExecutor.freeDeviceMemory();
+    }
+
+    /**
+     * It returns the current memory usage on the device in bytes.
+     * 
+     * @return long
+     *     Number of bytes used.
+     */
+    public long getCurrentDeviceMemoryUsage() {
+        return tornadoExecutor.getCurrentDeviceMemoryUsage();
+    }
+
     static class TornadoExecutor {
 
-        private List<ImmutableTaskGraph> immutableTaskGraphList;
+        private final List<ImmutableTaskGraph> immutableTaskGraphList;
 
         TornadoExecutor(ImmutableTaskGraph... immutableTaskGraphs) {
             immutableTaskGraphList = new ArrayList<>();
             Collections.addAll(immutableTaskGraphList, immutableTaskGraphs);
         }
 
-        void execute() {
-            immutableTaskGraphList.forEach(ImmutableTaskGraph::execute);
+        void execute(ExecutorFrame executionPackage) {
+            immutableTaskGraphList.forEach(immutableTaskGraph -> immutableTaskGraph.execute(executionPackage));
         }
 
-        void execute(GridScheduler gridScheduler) {
-            immutableTaskGraphList.forEach(immutableTaskGraph -> immutableTaskGraph.execute(gridScheduler));
-        }
-
-        void executeWithDynamicReconfiguration(Policy policy, DRMode mode) {
-            immutableTaskGraphList.forEach(immutableTaskGraph -> immutableTaskGraph.executeWithDynamicReconfiguration(policy, mode));
+        void withGridScheduler(GridScheduler gridScheduler) {
+            immutableTaskGraphList.forEach(immutableTaskGraph -> immutableTaskGraph.withGridScheduler(gridScheduler));
         }
 
         void warmup() {
@@ -322,14 +422,34 @@ public class TornadoExecutionPlan {
             immutableTaskGraphList.forEach(immutableTaskGraph -> immutableTaskGraph.withBatch(batchSize));
         }
 
+        void withMemoryLimit(String memoryLimit) {
+            immutableTaskGraphList.forEach(immutableTaskGraph -> immutableTaskGraph.withMemoryLimit(memoryLimit));
+        }
+
+        public void withoutMemoryLimit() {
+            immutableTaskGraphList.forEach(ImmutableTaskGraph::withoutMemoryLimit);
+        }
+
         /**
-         * For all task-graphs contained in an Executor, update the device
+         * For all task-graphs contained in an Executor, update the device.
          *
          * @param device
-         *            {@link TornadoDevice} object
+         *     {@link TornadoDevice} object
          */
         void setDevice(TornadoDevice device) {
-            immutableTaskGraphList.forEach(immutableTaskGraph -> immutableTaskGraph.setDevice(device));
+            immutableTaskGraphList.forEach(immutableTaskGraph -> immutableTaskGraph.withDevice(device));
+        }
+
+        void setDevice(String taskName, TornadoDevice device) {
+            immutableTaskGraphList.forEach(immutableTaskGraph -> immutableTaskGraph.withDevice(taskName, device));
+        }
+
+        void withConcurrentDevices() {
+            immutableTaskGraphList.forEach(ImmutableTaskGraph::withConcurrentDevices);
+        }
+
+        void withoutConcurrentDevices() {
+            immutableTaskGraphList.forEach(ImmutableTaskGraph::withoutConcurrentDevices);
         }
 
         void freeDeviceMemory() {
@@ -338,6 +458,12 @@ public class TornadoExecutionPlan {
 
         void transferToHost(Object... objects) {
             immutableTaskGraphList.forEach(immutableTaskGraph -> immutableTaskGraph.transferToHost(objects));
+        }
+
+        void partialTransferToHost(DataRange dataRange) {
+            // At this point we compute the offsets and the total size in bytes.
+            dataRange.materialize();
+            immutableTaskGraphList.forEach(immutableTaskGraph -> immutableTaskGraph.transferToHost(dataRange.getArray(), dataRange.getOffset(), dataRange.getPartialSize()));
         }
 
         boolean isFinished() {
@@ -392,6 +518,14 @@ public class TornadoExecutionPlan {
             return immutableTaskGraphList.stream().map(ImmutableTaskGraph::getDeviceKernelTime).mapToLong(Long::longValue).sum();
         }
 
+        long getTotalBytesCopyIn() {
+            return immutableTaskGraphList.stream().map(ImmutableTaskGraph::getTotalBytesCopyIn).mapToLong(Long::longValue).sum();
+        }
+
+        long getTotalBytesCopyOut() {
+            return immutableTaskGraphList.stream().map(ImmutableTaskGraph::getTotalBytesCopyOut).mapToLong(Long::longValue).sum();
+        }
+
         String getProfileLog() {
             return immutableTaskGraphList.stream().map(ImmutableTaskGraph::getProfileLog).collect(Collectors.joining());
         }
@@ -404,13 +538,13 @@ public class TornadoExecutionPlan {
             immutableTaskGraphList.forEach(ImmutableTaskGraph::clearProfiles);
         }
 
-        void useDefaultScheduler(boolean useDefaultScheduler) {
-            immutableTaskGraphList.forEach(immutableTaskGraph -> immutableTaskGraph.useDefaultScheduler(useDefaultScheduler));
+        void withDefaultScheduler() {
+            immutableTaskGraphList.forEach(immutableTaskGraph -> immutableTaskGraph.withDefaultScheduler(true));
         }
 
         TornadoDevice getDevice(int immutableTaskGraphIndex) {
             if (immutableTaskGraphList.size() < immutableTaskGraphIndex) {
-                throw new TornadoRuntimeException("TaskGraph index #" + immutableTaskGraphIndex + " does not exist in current executor");
+                throw new TornadoRuntimeException(STR."TaskGraph index #\{immutableTaskGraphIndex} does not exist in current executor");
             }
             return immutableTaskGraphList.get(immutableTaskGraphIndex).getDevice();
         }
@@ -428,6 +562,33 @@ public class TornadoExecutionPlan {
         void disableProfiler(ProfilerMode profilerMode) {
             immutableTaskGraphList.forEach(immutableTaskGraph -> immutableTaskGraph.disableProfiler(profilerMode));
         }
-    }
 
+        void withThreadInfo() {
+            immutableTaskGraphList.forEach(ImmutableTaskGraph::withThreadInfo);
+        }
+
+        void withoutThreadInfo() {
+            immutableTaskGraphList.forEach(ImmutableTaskGraph::withoutThreadInfo);
+        }
+
+        void withPrintKernel() {
+            immutableTaskGraphList.forEach(ImmutableTaskGraph::withPrintKernel);
+        }
+
+        void withoutPrintKernel() {
+            immutableTaskGraphList.forEach(ImmutableTaskGraph::withoutPrintKernel);
+        }
+
+        long getTotalBytesTransferred() {
+            return immutableTaskGraphList.stream().mapToLong(ImmutableTaskGraph::getTotalBytesTransferred).sum();
+        }
+
+        long getTotalDeviceMemoryUsage() {
+            return immutableTaskGraphList.stream().mapToLong(ImmutableTaskGraph::getTotalDeviceMemoryUsage).sum();
+        }
+
+        long getCurrentDeviceMemoryUsage() {
+            return immutableTaskGraphList.stream().mapToLong(ImmutableTaskGraph::getCurrentDeviceMemoryUsage).sum();
+        }
+    }
 }

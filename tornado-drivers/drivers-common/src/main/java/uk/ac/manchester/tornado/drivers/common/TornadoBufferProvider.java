@@ -2,7 +2,7 @@
  * This file is part of Tornado: A heterogeneous programming framework:
  * https://github.com/beehive-lab/tornadovm
  *
- * Copyright (c) 2022, APT Group, Department of Computer Science,
+ * Copyright (c) 2022, 2024, APT Group, Department of Computer Science,
  * The University of Manchester. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
@@ -12,7 +12,7 @@
  *
  * This code is distributed in the hope that it will be useful, but WITHOUT
  * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
- * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License
  * version 2 for more details (a copy is included in the LICENSE file that
  * accompanied this code).
  *
@@ -25,6 +25,7 @@ package uk.ac.manchester.tornado.drivers.common;
 import static uk.ac.manchester.tornado.runtime.common.TornadoOptions.DEVICE_AVAILABLE_MEMORY;
 
 import java.util.ArrayList;
+import java.util.List;
 
 import uk.ac.manchester.tornado.api.TornadoDeviceContext;
 import uk.ac.manchester.tornado.api.TornadoTargetDevice;
@@ -42,43 +43,19 @@ import uk.ac.manchester.tornado.runtime.common.TornadoOptions;
  */
 public abstract class TornadoBufferProvider {
 
-    public static class BufferInfo {
-        public final long buffer;
-        public final long size;
-
-        public BufferInfo(long buffer, long size) {
-            this.buffer = buffer;
-            this.size = size;
-        }
-
-        @Override
-        public boolean equals(Object o) {
-            if (this == o)
-                return true;
-            if (!(o instanceof BufferInfo))
-                return false;
-            BufferInfo that = (BufferInfo) o;
-            return buffer == that.buffer && size == that.size;
-        }
-
-        @Override
-        public int hashCode() {
-            return (int) buffer;
-        }
-    }
-
     protected final TornadoDeviceContext deviceContext;
-    protected final ArrayList<BufferInfo> freeBuffers;
-    protected final ArrayList<BufferInfo> usedBuffers;
+    protected final List<BufferContainer> freeBuffers;
+    protected final List<BufferContainer> usedBuffers;
     protected long currentMemoryAvailable;
+
+    private static final String RESET = "\u001B[0m";
+    public static final String YELLOW = "\u001B[33m";
+    private static final String OUT_OF_MEMORY_MESSAGE = YELLOW + "\n\tTo increase the maximum device memory, use -Dtornado.device.memory=<X>GB\n" + RESET;
 
     protected TornadoBufferProvider(TornadoDeviceContext deviceContext) {
         this.deviceContext = deviceContext;
         this.usedBuffers = new ArrayList<>();
         this.freeBuffers = new ArrayList<>();
-
-        // There is no way of querying the available memory on the device.
-        // Instead, use a flag similar to -Xmx.
         currentMemoryAvailable = TornadoOptions.DEVICE_AVAILABLE_MEMORY;
     }
 
@@ -86,19 +63,19 @@ public abstract class TornadoBufferProvider {
 
     protected abstract void releaseBuffer(long buffer);
 
-    private long allocate(long size) {
+    private synchronized long allocate(long size) {
         long buffer = allocateBuffer(size);
         currentMemoryAvailable -= size;
-        BufferInfo bufferInfo = new BufferInfo(buffer, size);
+        BufferContainer bufferInfo = new BufferContainer(buffer, size);
         usedBuffers.add(bufferInfo);
         return bufferInfo.buffer;
     }
 
-    private void freeBuffers(long size) {
+    private synchronized void freeBuffers(long size) {
         // Attempts to free buffers of given size.
         long remainingSize = size;
         while (!freeBuffers.isEmpty() && remainingSize > 0) {
-            BufferInfo bufferInfo = freeBuffers.remove(0);
+            BufferContainer bufferInfo = freeBuffers.removeFirst();
             TornadoInternalError.guarantee(!usedBuffers.contains(bufferInfo), "This buffer should not be used");
             remainingSize -= bufferInfo.size;
             currentMemoryAvailable += bufferInfo.size;
@@ -106,8 +83,21 @@ public abstract class TornadoBufferProvider {
         }
     }
 
-    private BufferInfo markBufferUsed(int freeBufferIndex) {
-        BufferInfo buffer = freeBuffers.get(freeBufferIndex);
+    public synchronized long deallocate() {
+        // Attempts to free buffers of given size.
+        long spaceDeallocated = 0;
+        while (!freeBuffers.isEmpty()) {
+            BufferContainer bufferInfo = freeBuffers.removeFirst();
+            TornadoInternalError.guarantee(!usedBuffers.contains(bufferInfo), "This buffer should not be used");
+            currentMemoryAvailable += bufferInfo.size;
+            spaceDeallocated += bufferInfo.size;
+            releaseBuffer(bufferInfo.buffer);
+        }
+        return spaceDeallocated;
+    }
+
+    private synchronized BufferContainer markBufferUsed(int freeBufferIndex) {
+        BufferContainer buffer = freeBuffers.get(freeBufferIndex);
         usedBuffers.add(buffer);
         freeBuffers.remove(buffer);
         return buffer;
@@ -120,14 +110,14 @@ public abstract class TornadoBufferProvider {
      * usually low, so searching sequentially should not take a lot of time.
      *
      * @param sizeInBytes
-     *            Size in bytes for the requested buffer.
+     *     Size in bytes for the requested buffer.
      * @return returns the index position of a free buffer within the free buffer
-     *         list. It returns -1 if a free buffer slot is not found.
+     *     list. It returns -1 if a free buffer slot is not found.
      */
-    private int bufferIndexOfAFreeSpace(long sizeInBytes) {
+    private synchronized int bufferIndexOfAFreeSpace(long sizeInBytes) {
         int minBufferIndex = -1;
         for (int i = 0; i < freeBuffers.size(); i++) {
-            BufferInfo bufferInfo = freeBuffers.get(i);
+            BufferContainer bufferInfo = freeBuffers.get(i);
             if (bufferInfo.size >= sizeInBytes && (minBufferIndex == -1 || bufferInfo.size < freeBuffers.get(minBufferIndex).size)) {
                 minBufferIndex = i;
             }
@@ -140,15 +130,15 @@ public abstract class TornadoBufferProvider {
      * to allocate.
      *
      * @param sizeInBytes
-     *            Size in bytes for the requested buffer.
+     *     Size in bytes for the requested buffer.
      * @return It returns a buffer native pointer.
      */
-    private long freeUnusedNativeBufferAndAssignRegion(long sizeInBytes) {
+    private synchronized long freeUnusedNativeBufferAndAssignRegion(long sizeInBytes) {
         freeBuffers(sizeInBytes);
         if (sizeInBytes <= currentMemoryAvailable) {
             return allocate(sizeInBytes);
         } else {
-            throw new TornadoOutOfMemoryException("Unable to allocate " + sizeInBytes + " bytes of memory.");
+            throw new TornadoOutOfMemoryException("Unable to allocate " + sizeInBytes + " bytes of memory." + OUT_OF_MEMORY_MESSAGE);
         }
     }
 
@@ -158,18 +148,18 @@ public abstract class TornadoBufferProvider {
      * target device. Otherwise, it throws an exception.
      *
      * @param sizeInBytes
-     *            Size in bytes for the requested buffer.
+     *     Size in bytes for the requested buffer.
      * @return Returns a pointer to the native buffer (JNI).
      *
      * @throws {@link
-     *             TornadoOutOfMemoryException}
+     *     TornadoOutOfMemoryException}
      */
-    public long getBufferWithSize(long sizeInBytes) {
-        TornadoTargetDevice targetDevice = deviceContext.getDevice();
-        if (sizeInBytes <= currentMemoryAvailable && sizeInBytes < targetDevice.getDeviceMaxAllocationSize()) {
+    public synchronized long getOrAllocateBufferWithSize(long sizeInBytes) {
+        TornadoTargetDevice device = deviceContext.getDevice();
+        if (sizeInBytes <= currentMemoryAvailable && sizeInBytes < device.getDeviceMaxAllocationSize()) {
             // Allocate if there is enough device memory.
             return allocate(sizeInBytes);
-        } else if (sizeInBytes < targetDevice.getDeviceMaxAllocationSize()) {
+        } else if (sizeInBytes < device.getDeviceMaxAllocationSize()) {
             int minBufferIndex = bufferIndexOfAFreeSpace(sizeInBytes);
             // If a buffer was found, mark it as used and return it.
             if (minBufferIndex != -1) {
@@ -178,7 +168,7 @@ public abstract class TornadoBufferProvider {
                 return freeUnusedNativeBufferAndAssignRegion(sizeInBytes);
             }
         } else {
-            throw new TornadoOutOfMemoryException("Unable to allocate " + sizeInBytes + " bytes of memory.");
+            throw new TornadoOutOfMemoryException("[ERROR] Unable to allocate " + sizeInBytes + " bytes of memory." + OUT_OF_MEMORY_MESSAGE);
         }
     }
 
@@ -186,24 +176,54 @@ public abstract class TornadoBufferProvider {
      * Removes the buffer from the {@link #usedBuffers} list and add it to
      * the @{@link #freeBuffers} list.
      */
-    public void markBufferReleased(long buffer, long size) {
+    public synchronized void markBufferReleased(long buffer) {
         int foundIndex = -1;
         for (int i = 0; i < usedBuffers.size(); i++) {
-            if (usedBuffers.get(i).buffer == buffer) {
+            // find the buffer slot to mark it as free
+            if (usedBuffers.get(i) != null && usedBuffers.get(i).buffer == buffer) {
                 foundIndex = i;
                 break;
             }
         }
-        TornadoInternalError.guarantee(foundIndex != -1, "Expected the buffer to be allocated and used at this point.");
-        BufferInfo removedBuffer = usedBuffers.remove(foundIndex);
-        freeBuffers.add(removedBuffer);
+
+        if (foundIndex != -1) {
+            // if found, we mark it as free by inserting it into the free list
+            BufferContainer removedBuffer = usedBuffers.remove(foundIndex);
+            freeBuffers.add(removedBuffer);
+        }
     }
 
-    public boolean checkBufferAvailability(int numBuffersRequired) {
-        return freeBuffers.size() >= numBuffersRequired;
+    /**
+     * Function that returns true if the there are, at least numBuffers available in the free list.
+     * 
+     * @param numBuffers
+     *     Number of free buffers.
+     * @return boolean.
+     */
+    public boolean isNumFreeBuffersAvailable(int numBuffers) {
+        return freeBuffers.size() >= numBuffers;
     }
 
-    public void resetBuffers() {
+    public synchronized void resetBuffers() {
         freeBuffers(DEVICE_AVAILABLE_MEMORY);
+    }
+
+    private record BufferContainer(long buffer, long size) {
+
+        @Override
+        public boolean equals(Object object) {
+            if (this == object) {
+                return true;
+            }
+            if (!(object instanceof BufferContainer that)) {
+                return false;
+            }
+            return buffer == that.buffer && size == that.size;
+        }
+
+        @Override
+        public int hashCode() {
+            return (int) buffer;
+        }
     }
 }

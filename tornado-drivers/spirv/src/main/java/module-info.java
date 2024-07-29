@@ -1,3 +1,5 @@
+import uk.ac.manchester.tornado.runtime.TornadoBackendProvider;
+
 module tornado.drivers.spirv {
     requires transitive jdk.internal.vm.ci;
     requires transitive jdk.internal.vm.compiler;
@@ -5,6 +7,7 @@ module tornado.drivers.spirv {
     requires transitive tornado.runtime;
     requires tornado.drivers.common;
     requires beehive.spirv.lib;
+    requires beehive.levelzero.jni;
 
     // FIXME: Remove dependency to tornado.drivers.opencl
     requires tornado.drivers.opencl;
@@ -21,6 +24,6 @@ module tornado.drivers.spirv {
     exports uk.ac.manchester.tornado.drivers.spirv.mm;
     exports uk.ac.manchester.tornado.drivers.spirv.runtime;
 
-    provides uk.ac.manchester.tornado.runtime.TornadoDriverProvider with
+    provides TornadoBackendProvider with
             uk.ac.manchester.tornado.drivers.spirv.SPIRVTornadoDriverProvider;
 }

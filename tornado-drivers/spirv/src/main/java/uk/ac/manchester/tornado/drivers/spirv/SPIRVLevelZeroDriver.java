@@ -12,7 +12,7 @@
  *
  * This code is distributed in the hope that it will be useful, but WITHOUT
  * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
- * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License
  * version 2 for more details (a copy is included in the LICENSE file that
  * accompanied this code).
  *
@@ -26,28 +26,35 @@ package uk.ac.manchester.tornado.drivers.spirv;
 import java.util.ArrayList;
 import java.util.List;
 
+import uk.ac.manchester.tornado.api.exceptions.TornadoRuntimeException;
 import uk.ac.manchester.tornado.drivers.spirv.levelzero.LevelZeroDriver;
 import uk.ac.manchester.tornado.drivers.spirv.levelzero.ZeDriverHandle;
 import uk.ac.manchester.tornado.drivers.spirv.levelzero.ZeInitFlag;
+import uk.ac.manchester.tornado.drivers.spirv.levelzero.ZeResult;
 
 public class SPIRVLevelZeroDriver implements SPIRVDispatcher {
 
-    private LevelZeroDriver driver;
-    private ZeDriverHandle driversHandler;
-    private List<SPIRVPlatform> spirvPlatforms;
+    private final ZeDriverHandle driversHandler;
+    private final List<SPIRVPlatform> spirvPlatforms;
 
     public SPIRVLevelZeroDriver() {
-        driver = new LevelZeroDriver();
-        driver.zeInit(ZeInitFlag.ZE_INIT_FLAG_GPU_ONLY);
+        LevelZeroDriver driver = new LevelZeroDriver();
+        int errorCode = driver.zeInit(ZeInitFlag.ZE_INIT_FLAG_GPU_ONLY);
+        if (errorCode != ZeResult.ZE_RESULT_SUCCESS) {
+            throw new TornadoRuntimeException("[ERROR] Level Zero Driver Not Found");
+        }
 
         int[] numDrivers = new int[1];
-        driver.zeDriverGet(numDrivers, null);
+        errorCode = driver.zeDriverGet(numDrivers, null);
+        if (errorCode != ZeResult.ZE_RESULT_SUCCESS) {
+            throw new TornadoRuntimeException("[ERROR] Level Zero Driver Not Found");
+        }
         spirvPlatforms = new ArrayList<>();
 
         driversHandler = new ZeDriverHandle(numDrivers[0]);
         driver.zeDriverGet(numDrivers, driversHandler);
         for (int i = 0; i < numDrivers[0]; i++) {
-            SPIRVPlatform platform = new SPIRVLevelZeroPlatform(driver, driversHandler, i, driversHandler.getZe_driver_handle_t_ptr()[i]);
+            SPIRVPlatform platform = new SPIRVLevelZeroPlatform(driver, driversHandler, i);
             spirvPlatforms.add(platform);
         }
     }

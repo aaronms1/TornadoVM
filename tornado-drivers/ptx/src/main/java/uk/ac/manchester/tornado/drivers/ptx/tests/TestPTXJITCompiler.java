@@ -12,7 +12,7 @@
  *
  * This code is distributed in the hope that it will be useful, but WITHOUT
  * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
- * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License
  * version 2 for more details (a copy is included in the LICENSE file that
  * accompanied this code).
  *
@@ -33,11 +33,11 @@ import jdk.vm.ci.meta.ResolvedJavaMethod;
 import uk.ac.manchester.tornado.api.annotations.Parallel;
 import uk.ac.manchester.tornado.api.common.Access;
 import uk.ac.manchester.tornado.api.common.TornadoDevice;
-import uk.ac.manchester.tornado.api.memory.TornadoDeviceObjectState;
-import uk.ac.manchester.tornado.drivers.common.CompilerUtil;
+import uk.ac.manchester.tornado.api.memory.DeviceBufferState;
 import uk.ac.manchester.tornado.drivers.common.MetaCompilation;
+import uk.ac.manchester.tornado.drivers.common.utils.CompilerUtil;
 import uk.ac.manchester.tornado.drivers.ptx.PTX;
-import uk.ac.manchester.tornado.drivers.ptx.PTXDriver;
+import uk.ac.manchester.tornado.drivers.ptx.PTXBackendImpl;
 import uk.ac.manchester.tornado.drivers.ptx.graal.PTXInstalledCode;
 import uk.ac.manchester.tornado.drivers.ptx.graal.PTXProviders;
 import uk.ac.manchester.tornado.drivers.ptx.graal.backend.PTXBackend;
@@ -45,14 +45,14 @@ import uk.ac.manchester.tornado.drivers.ptx.graal.compiler.PTXCompilationResult;
 import uk.ac.manchester.tornado.drivers.ptx.graal.compiler.PTXCompiler;
 import uk.ac.manchester.tornado.drivers.ptx.runtime.PTXTornadoDevice;
 import uk.ac.manchester.tornado.runtime.TornadoCoreRuntime;
-import uk.ac.manchester.tornado.runtime.common.DeviceObjectState;
-import uk.ac.manchester.tornado.runtime.common.KernelArgs;
+import uk.ac.manchester.tornado.runtime.common.KernelStackFrame;
 import uk.ac.manchester.tornado.runtime.common.TornadoInstalledCode;
+import uk.ac.manchester.tornado.runtime.common.XPUDeviceBufferState;
 import uk.ac.manchester.tornado.runtime.graal.compiler.TornadoSuitesProvider;
 import uk.ac.manchester.tornado.runtime.profiler.EmptyProfiler;
 import uk.ac.manchester.tornado.runtime.sketcher.Sketch;
 import uk.ac.manchester.tornado.runtime.tasks.CompilableTask;
-import uk.ac.manchester.tornado.runtime.tasks.GlobalObjectState;
+import uk.ac.manchester.tornado.runtime.tasks.DataObjectState;
 import uk.ac.manchester.tornado.runtime.tasks.meta.ScheduleMetaData;
 import uk.ac.manchester.tornado.runtime.tasks.meta.TaskMetaData;
 
@@ -63,10 +63,15 @@ import uk.ac.manchester.tornado.runtime.tasks.meta.TaskMetaData;
  */
 public class TestPTXJITCompiler {
 
-    public static void methodToCompile(int[] a, int[] b, double[] c) {
+    public static void methodToCompile(int[] a, int[] b, float[] c) {
         for (@Parallel int i = 0; i < c.length; i++) {
-            c[i] = 0.12 * a[i] * b[i];
+            c[i] = 0.12f * a[i] * b[i];
         }
+    }
+
+    public static void main(String[] args) {
+        System.out.print("Running Native: uk.ac.manchester.tornado.drivers.ptx.tests.TestPTXJITCompiler");
+        new TestPTXJITCompiler().test();
     }
 
     public MetaCompilation compileMethod(Class<?> klass, String methodName, PTXTornadoDevice tornadoDevice, Object... parameters) {
@@ -81,9 +86,9 @@ public class TestPTXJITCompiler {
         ResolvedJavaMethod resolvedJavaMethod = tornadoRuntime.resolveMethod(methodToCompile);
 
         // Get the backend from TornadoVM
-        PTXBackend ptxBackend = tornadoRuntime.getDriver(PTXDriver.class).getDefaultBackend();
+        PTXBackend ptxBackend = tornadoRuntime.getBackend(PTXBackendImpl.class).getDefaultBackend();
 
-        TornadoDevice device = tornadoRuntime.getDriver(PTXDriver.class).getDefaultDevice();
+        TornadoDevice device = tornadoRuntime.getBackend(PTXBackendImpl.class).getDefaultDevice();
 
         // Create a new task for TornadoVM
         ScheduleMetaData scheduleMetaData = new ScheduleMetaData("s0");
@@ -107,42 +112,43 @@ public class TestPTXJITCompiler {
         return new MetaCompilation(taskMeta, (PTXInstalledCode) ptxCode);
     }
 
-    public void runWithPTXAPI(PTXTornadoDevice tornadoDevice, PTXInstalledCode ptxCode, TaskMetaData taskMeta, int[] a, int[] b, double[] c) {
+    public void runWithPTXAPI(PTXTornadoDevice tornadoDevice, PTXInstalledCode ptxCode, TaskMetaData taskMeta, int[] a, int[] b, float[] c) {
         PTX.run(tornadoDevice, ptxCode, taskMeta, new Access[] { Access.READ_ONLY, Access.READ_ONLY, Access.WRITE_ONLY }, a, b, c);
     }
 
-    public void run(PTXTornadoDevice tornadoDevice, PTXInstalledCode ptxCode, TaskMetaData taskMeta, int[] a, int[] b, double[] c) {
+    public void run(PTXTornadoDevice tornadoDevice, PTXInstalledCode ptxCode, TaskMetaData taskMeta, int[] a, int[] b, float[] c) {
         // First we allocate, A, B and C
-        GlobalObjectState stateA = new GlobalObjectState();
-        DeviceObjectState objectStateA = stateA.getDeviceState(tornadoDevice);
+        DataObjectState stateA = new DataObjectState();
+        XPUDeviceBufferState objectStateA = stateA.getDeviceBufferState(tornadoDevice);
 
-        GlobalObjectState stateB = new GlobalObjectState();
-        DeviceObjectState objectStateB = stateB.getDeviceState(tornadoDevice);
+        DataObjectState stateB = new DataObjectState();
+        XPUDeviceBufferState objectStateB = stateB.getDeviceBufferState(tornadoDevice);
 
-        GlobalObjectState stateC = new GlobalObjectState();
-        DeviceObjectState objectStateC = stateC.getDeviceState(tornadoDevice);
+        DataObjectState stateC = new DataObjectState();
+        XPUDeviceBufferState objectStateC = stateC.getDeviceBufferState(tornadoDevice);
 
-        tornadoDevice.allocateObjects(new Object[] { a, b, c }, 0, new TornadoDeviceObjectState[] { objectStateA, objectStateB, objectStateC });
+        tornadoDevice.allocateObjects(new Object[] { a, b, c }, 0, new DeviceBufferState[] { objectStateA, objectStateB, objectStateC });
 
+        final long executionPlanId = 0;
         // Copy-IN A
-        tornadoDevice.ensurePresent(a, objectStateA, null, 0, 0);
+        tornadoDevice.ensurePresent(executionPlanId, a, objectStateA, null, 0, 0);
         // Copy-IN B
-        tornadoDevice.ensurePresent(b, objectStateB, null, 0, 0);
+        tornadoDevice.ensurePresent(executionPlanId, b, objectStateB, null, 0, 0);
 
         // Create call wrapper
-        KernelArgs callWrapper = tornadoDevice.createCallWrapper(3);
+        KernelStackFrame callWrapper = tornadoDevice.createKernelStackFrame(executionPlanId, 3);
 
         callWrapper.setKernelContext(new HashMap<>());
 
-        callWrapper.addCallArgument(objectStateA.getObjectBuffer().toBuffer(), true);
-        callWrapper.addCallArgument(objectStateB.getObjectBuffer().toBuffer(), true);
-        callWrapper.addCallArgument(objectStateC.getObjectBuffer().toBuffer(), true);
+        callWrapper.addCallArgument(objectStateA.getXPUBuffer().toBuffer(), true);
+        callWrapper.addCallArgument(objectStateB.getXPUBuffer().toBuffer(), true);
+        callWrapper.addCallArgument(objectStateC.getXPUBuffer().toBuffer(), true);
 
         // Run the code
-        ptxCode.launchWithoutDependencies(callWrapper, null, taskMeta, 0);
+        ptxCode.launchWithoutDependencies(executionPlanId, callWrapper, null, taskMeta, 0);
 
         // Obtain the result
-        tornadoDevice.streamOutBlocking(c, 0, objectStateC, null);
+        tornadoDevice.streamOutBlocking(executionPlanId, c, 0, objectStateC, null);
     }
 
     public void test() {
@@ -151,7 +157,7 @@ public class TestPTXJITCompiler {
         final int N = 128;
         int[] a = new int[N];
         int[] b = new int[N];
-        double[] c = new double[N];
+        float[] c = new float[N];
 
         Arrays.fill(a, -10);
         Arrays.fill(b, 10);
@@ -168,7 +174,7 @@ public class TestPTXJITCompiler {
 
         boolean correct = true;
         for (int i = 0; i < c.length; i++) {
-            double seq = 0.12 * a[i] * b[i];
+            float seq = 0.12f * a[i] * b[i];
             if (Math.abs(c[i] - seq) > 0.01) {
                 System.err.println(i + " Fault result = " + seq + " " + c[i]);
                 correct = false;
@@ -181,11 +187,6 @@ public class TestPTXJITCompiler {
             System.out.println(" ................ [PASS]");
         }
 
-    }
-
-    public static void main(String[] args) {
-        System.out.print("Running Native: uk.ac.manchester.tornado.drivers.ptx.tests.TestPTXJITCompiler");
-        new TestPTXJITCompiler().test();
     }
 
 }

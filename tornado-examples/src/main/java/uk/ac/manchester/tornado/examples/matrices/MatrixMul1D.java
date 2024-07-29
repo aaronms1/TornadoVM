@@ -6,7 +6,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *    http://www.apache.org/licenses/LICENSE-2.0
+ * http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -23,35 +23,36 @@ import java.util.stream.IntStream;
 
 import uk.ac.manchester.tornado.api.ImmutableTaskGraph;
 import uk.ac.manchester.tornado.api.TaskGraph;
-import uk.ac.manchester.tornado.api.TornadoDriver;
+import uk.ac.manchester.tornado.api.TornadoBackend;
 import uk.ac.manchester.tornado.api.TornadoExecutionPlan;
 import uk.ac.manchester.tornado.api.annotations.Parallel;
 import uk.ac.manchester.tornado.api.common.TornadoDevice;
 import uk.ac.manchester.tornado.api.enums.DataTransferMode;
-import uk.ac.manchester.tornado.api.runtime.TornadoRuntime;
+import uk.ac.manchester.tornado.api.runtime.TornadoRuntimeProvider;
+import uk.ac.manchester.tornado.api.types.arrays.FloatArray;
 
 /**
  * <p>
  * How to run?
  * </p>
  * <code>
- *     tornado -m tornado.examples/uk.ac.manchester.tornado.examples.matrices.MatrixMul1D
+ * tornado -m tornado.examples/uk.ac.manchester.tornado.examples.matrices.MatrixMul1D
  * </code>
  *
  */
 public class MatrixMul1D {
-
+    // CHECKSTYLE:OFF
     public static final int WARMUP_ITERATIONS = 15;
     public static final int EXECUTE_ITERATIONS = 100;
 
-    private static void matrixMultiplication(final float[] A, final float[] B, final float[] C, final int size) {
+    private static void matrixMultiplication(final FloatArray A, final FloatArray B, final FloatArray C, final int size) {
         for (@Parallel int i = 0; i < size; i++) {
             for (@Parallel int j = 0; j < size; j++) {
                 float sum = 0.0f;
                 for (int k = 0; k < size; k++) {
-                    sum += A[(i * size) + k] * B[(k * size) + j];
+                    sum += A.get((i * size) + k) * B.get((k * size) + j);
                 }
-                C[(i * size) + j] = sum;
+                C.set((i * size) + j, sum);
             }
         }
     }
@@ -62,15 +63,15 @@ public class MatrixMul1D {
             N = Integer.parseInt(args[0]);
         }
 
-        float[] matrixA = new float[N * N];
-        float[] matrixB = new float[N * N];
-        float[] matrixCSeq = new float[N * N];
-        float[] matrixCCUDA = new float[N * N];
-        float[] matrixCOCL = new float[N * N];
+        FloatArray matrixA = new FloatArray(N * N);
+        FloatArray matrixB = new FloatArray(N * N);
+        FloatArray matrixCSeq = new FloatArray(N * N);
+        FloatArray matrixCCUDA = new FloatArray(N * N);
+        FloatArray matrixCOCL = new FloatArray(N * N);
 
         IntStream.range(0, N * N).parallel().forEach(idx -> {
-            matrixA[idx] = 2.5f;
-            matrixB[idx] = 3.5f;
+            matrixA.set(idx, 2.5f);
+            matrixB.set(idx, 3.5f);
         });
 
         TaskGraph cudaTaskGraph = new TaskGraph("cuda_old_api") //
@@ -78,7 +79,7 @@ public class MatrixMul1D {
                 .task("t0", MatrixMul1D::matrixMultiplication, matrixA, matrixB, matrixCCUDA, N) //
                 .transferToHost(DataTransferMode.EVERY_EXECUTION, matrixCCUDA);
 
-        TornadoDriver cudaDriver = TornadoRuntime.getTornadoRuntime().getDriver(0);
+        TornadoBackend cudaDriver = TornadoRuntimeProvider.getTornadoRuntime().getBackend(0);
         TornadoDevice cudaDevice = cudaDriver.getDevice(0);
 
         ImmutableTaskGraph immutableTaskGraph = cudaTaskGraph.snapshot();
@@ -91,7 +92,7 @@ public class MatrixMul1D {
         }
 
         // Time CUDA
-        long start,stop;
+        long start, stop;
         long[] execTimesCUDA = new long[EXECUTE_ITERATIONS];
         for (int i = 0; i < execTimesCUDA.length; i++) {
             start = System.currentTimeMillis();
@@ -102,10 +103,11 @@ public class MatrixMul1D {
 
         OptionalDouble avgCudaOptional = Arrays.stream(execTimesCUDA).average();
         double averageCUDA;
-        if (avgCudaOptional.isPresent())
+        if (avgCudaOptional.isPresent()) {
             averageCUDA = avgCudaOptional.getAsDouble();
-        else
+        } else {
             throw new Exception("Could not get average execution time");
+        }
 
         TaskGraph oclTaskGraph = new TaskGraph("ocl_old_api") //
                 .transferToDevice(DataTransferMode.FIRST_EXECUTION, matrixA, matrixB) //
@@ -113,9 +115,9 @@ public class MatrixMul1D {
                 .transferToHost(DataTransferMode.EVERY_EXECUTION, matrixCOCL);
 
         // Get the same device but running the OCL backend
-        TornadoDriver oclDriver = TornadoRuntime.getTornadoRuntime().getDriver(1);
+        TornadoBackend oclDriver = TornadoRuntimeProvider.getTornadoRuntime().getBackend(1);
         TornadoDevice oclDevice = null;
-        for (int i = 0; i < oclDriver.getDeviceCount(); i++) {
+        for (int i = 0; i < oclDriver.getNumDevices(); i++) {
             TornadoDevice device = oclDriver.getDevice(i);
             if (device.getPhysicalDevice().getDeviceName().equalsIgnoreCase(cudaDevice.getPhysicalDevice().getDeviceName())) {
                 oclDevice = device;
@@ -190,3 +192,4 @@ public class MatrixMul1D {
 
     }
 }
+// CHECKSTYLE:ON

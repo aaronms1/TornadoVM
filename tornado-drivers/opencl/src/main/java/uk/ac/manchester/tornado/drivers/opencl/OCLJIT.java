@@ -12,15 +12,13 @@
  *
  * This code is distributed in the hope that it will be useful, but WITHOUT
  * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
- * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License
  * version 2 for more details (a copy is included in the LICENSE file that
  * accompanied this code).
  *
  * You should have received a copy of the GNU General Public License version
  * 2 along with this work; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
- *
- * Authors: James Clarkson
  *
  */
 package uk.ac.manchester.tornado.drivers.opencl;
@@ -68,7 +66,7 @@ public class OCLJIT {
 
             System.out.printf("method: name=%s, signature=%s\n", resolvedMethod.getName(), resolvedMethod.getSignature());
 
-            final OCLBackend backend = getTornadoRuntime().getDriver(OCLDriver.class).getDefaultBackend();
+            final OCLBackend backend = getTornadoRuntime().getBackend(OCLBackendImpl.class).getDefaultBackend();
 
             TaskMetaData meta = TaskMetaData.create(new ScheduleMetaData("s0"), methodName, method);
 

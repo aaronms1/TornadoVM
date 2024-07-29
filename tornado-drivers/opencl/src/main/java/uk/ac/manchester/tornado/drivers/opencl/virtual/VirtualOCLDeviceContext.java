@@ -12,7 +12,7 @@
  *
  * This code is distributed in the hope that it will be useful, but WITHOUT
  * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
- * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License
  * version 2 for more details (a copy is included in the LICENSE file that
  * accompanied this code).
  *
@@ -23,13 +23,15 @@
  */
 package uk.ac.manchester.tornado.drivers.opencl.virtual;
 
+import java.util.Set;
+
 import uk.ac.manchester.tornado.api.common.Event;
 import uk.ac.manchester.tornado.api.common.SchedulableTask;
-import uk.ac.manchester.tornado.api.runtime.TornadoRuntime;
+import uk.ac.manchester.tornado.api.runtime.TornadoRuntimeProvider;
 import uk.ac.manchester.tornado.drivers.common.TornadoBufferProvider;
+import uk.ac.manchester.tornado.drivers.opencl.OCLBackendImpl;
 import uk.ac.manchester.tornado.drivers.opencl.OCLCodeCache;
 import uk.ac.manchester.tornado.drivers.opencl.OCLDeviceContextInterface;
-import uk.ac.manchester.tornado.drivers.opencl.OCLDriver;
 import uk.ac.manchester.tornado.drivers.opencl.OCLProgram;
 import uk.ac.manchester.tornado.drivers.opencl.OCLTargetDevice;
 import uk.ac.manchester.tornado.drivers.opencl.enums.OCLDeviceType;
@@ -37,34 +39,20 @@ import uk.ac.manchester.tornado.drivers.opencl.graal.OCLInstalledCode;
 import uk.ac.manchester.tornado.drivers.opencl.graal.compiler.OCLCompilationResult;
 import uk.ac.manchester.tornado.drivers.opencl.mm.OCLMemoryManager;
 import uk.ac.manchester.tornado.runtime.EmptyEvent;
-import uk.ac.manchester.tornado.runtime.common.Tornado;
-import uk.ac.manchester.tornado.runtime.common.TornadoLogger;
 import uk.ac.manchester.tornado.runtime.tasks.meta.TaskMetaData;
 
-public class VirtualOCLDeviceContext extends TornadoLogger implements OCLDeviceContextInterface {
+public class VirtualOCLDeviceContext implements OCLDeviceContextInterface {
 
     private final OCLTargetDevice device;
     private final VirtualOCLContext context;
     private final OCLCodeCache codeCache;
     private boolean wasReset;
-    private boolean useRelativeAddresses;
-    private boolean printOnce = true;
 
     protected VirtualOCLDeviceContext(OCLTargetDevice device, VirtualOCLContext context) {
         this.device = device;
         this.context = context;
         this.codeCache = new OCLCodeCache(this);
-
-        setRelativeAddressesFlag();
         device.setDeviceContext(this);
-    }
-
-    private void setRelativeAddressesFlag() {
-        if (isPlatformFPGA() && !Tornado.OPENCL_USE_RELATIVE_ADDRESSES) {
-            useRelativeAddresses = true;
-        } else {
-            useRelativeAddresses = Tornado.OPENCL_USE_RELATIVE_ADDRESSES;
-        }
     }
 
     public OCLTargetDevice getDevice() {
@@ -78,7 +66,12 @@ public class VirtualOCLDeviceContext extends TornadoLogger implements OCLDeviceC
 
     @Override
     public int getDriverIndex() {
-        return TornadoRuntime.getTornadoRuntime().getDriverIndex(OCLDriver.class);
+        return TornadoRuntimeProvider.getTornadoRuntime().getBackendIndex(OCLBackendImpl.class);
+    }
+
+    @Override
+    public Set<Long> getRegisteredPlanIds() {
+        return Set.of();
     }
 
     @Override
@@ -121,42 +114,44 @@ public class VirtualOCLDeviceContext extends TornadoLogger implements OCLDeviceC
     }
 
     @Override
-    public void sync() {
+    public void sync(long executionPlanId) {
     }
 
     @Override
-    public int enqueueBarrier() {
+    public int enqueueBarrier(long executionPlanId) {
         return 0;
     }
 
     @Override
-    public int enqueueBarrier(int[] events) {
+    public int enqueueBarrier(long executionPlanId, int[] events) {
         return 0;
     }
 
     @Override
-    public int enqueueMarker() {
+    public int enqueueMarker(long executionPlanId) {
         return 0;
     }
 
     @Override
-    public int enqueueMarker(int[] events) {
+    public int enqueueMarker(long executionPlanId, int[] events) {
         return 0;
     }
 
     @Override
-    public Event resolveEvent(int event) {
+    public Event resolveEvent(long executionPlanId, int event) {
         return new EmptyEvent();
     }
 
     @Override
-    public void flushEvents() {
+    public void flushEvents(long executionPlanId) {
     }
 
-    public void reset() {
+    @Override
+    public void reset(long executionPlanId) {
         wasReset = true;
     }
 
+    @Override
     public VirtualOCLTornadoDevice asMapping() {
         return new VirtualOCLTornadoDevice(context.getPlatformIndex(), device.getIndex());
     }
@@ -165,16 +160,12 @@ public class VirtualOCLDeviceContext extends TornadoLogger implements OCLDeviceC
         return String.format("opencl-%d-%d", context.getPlatformIndex(), device.getIndex());
     }
 
+    @Override
     public void dumpEvents() {
     }
 
     @Override
-    public void flush() {
-    }
-
-    @Override
-    public boolean needsBump() {
-        return false;
+    public void flush(long executionPlanId) {
     }
 
     @Override
@@ -189,7 +180,7 @@ public class VirtualOCLDeviceContext extends TornadoLogger implements OCLDeviceC
 
     @Override
     public boolean isPlatformFPGA() {
-        return getDevice().getDeviceType() == OCLDeviceType.CL_DEVICE_TYPE_ACCELERATOR && (getPlatformContext().getPlatform().getName().toLowerCase().contains("fpga") || isPlatformXilinxFPGA());
+        return this.getDevice().getDeviceType() == OCLDeviceType.CL_DEVICE_TYPE_ACCELERATOR && (getPlatformContext().getPlatform().getName().toLowerCase().contains("fpga") || isPlatformXilinxFPGA());
     }
 
     @Override
@@ -212,30 +203,37 @@ public class VirtualOCLDeviceContext extends TornadoLogger implements OCLDeviceC
         return context.getPlatformIndex();
     }
 
+    @Override
     public boolean isKernelAvailable() {
         return true;
     }
 
+    @Override
     public OCLInstalledCode installCode(OCLCompilationResult result) {
         return null;
     }
 
+    @Override
     public OCLInstalledCode installCode(TaskMetaData meta, String id, String entryPoint, byte[] code) {
         return null;
     }
 
-    public OCLInstalledCode installCode(String id, String entryPoint, byte[] code, boolean shouldCompile) {
+    @Override
+    public OCLInstalledCode installCode(String id, String entryPoint, byte[] code, boolean printKernel) {
         return null;
     }
 
+    @Override
     public boolean isCached(String id, String entryPoint) {
         return false;
     }
 
+    @Override
     public OCLInstalledCode getInstalledCode(String id, String entryPoint) {
         return null;
     }
 
+    @Override
     public OCLCodeCache getCodeCache() {
         return codeCache;
     }
@@ -244,4 +242,5 @@ public class VirtualOCLDeviceContext extends TornadoLogger implements OCLDeviceC
     public boolean isCached(String methodName, SchedulableTask task) {
         return false;
     }
+
 }

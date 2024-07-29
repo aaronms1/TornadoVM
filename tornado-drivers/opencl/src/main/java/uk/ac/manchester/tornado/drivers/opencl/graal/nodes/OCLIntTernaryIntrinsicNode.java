@@ -12,15 +12,13 @@
  *
  * This code is distributed in the hope that it will be useful, but WITHOUT
  * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
- * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License
  * version 2 for more details (a copy is included in the LICENSE file that
  * accompanied this code).
  *
  * You should have received a copy of the GNU General Public License version
  * 2 along with this work; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
- *
- * Authors: James Clarkson
  *
  */
 package uk.ac.manchester.tornado.drivers.opencl.graal.nodes;
@@ -45,40 +43,21 @@ import org.graalvm.compiler.nodes.spi.NodeLIRBuilderTool;
 
 import jdk.vm.ci.meta.JavaKind;
 import jdk.vm.ci.meta.Value;
-import uk.ac.manchester.tornado.api.collections.math.TornadoMath;
 import uk.ac.manchester.tornado.api.exceptions.TornadoInternalError;
+import uk.ac.manchester.tornado.api.math.TornadoMath;
 import uk.ac.manchester.tornado.drivers.opencl.graal.lir.OCLArithmeticTool;
 import uk.ac.manchester.tornado.drivers.opencl.graal.lir.OCLBuiltinTool;
 import uk.ac.manchester.tornado.drivers.opencl.graal.lir.OCLLIRStmt.AssignStmt;
-import uk.ac.manchester.tornado.runtime.graal.phases.MarkIntIntrinsicNode;
+import uk.ac.manchester.tornado.runtime.graal.nodes.interfaces.MarkIntIntrinsicNode;
 
 @NodeInfo(nameTemplate = "{p#operation/s}")
 public class OCLIntTernaryIntrinsicNode extends TernaryNode implements ArithmeticLIRLowerable, MarkIntIntrinsicNode {
 
+    public static final NodeClass<OCLIntTernaryIntrinsicNode> TYPE = NodeClass.create(OCLIntTernaryIntrinsicNode.class);
+    protected final Operation operation;
     protected OCLIntTernaryIntrinsicNode(ValueNode x, ValueNode y, ValueNode z, Operation op, JavaKind kind) {
         super(TYPE, StampFactory.forKind(kind), x, y, z);
         this.operation = op;
-    }
-
-    public static final NodeClass<OCLIntTernaryIntrinsicNode> TYPE = NodeClass.create(OCLIntTernaryIntrinsicNode.class);
-    protected final Operation operation;
-
-    @Override
-    public Stamp foldStamp(Stamp stampX, Stamp stampY, Stamp stampZ) {
-        return stamp(NodeView.DEFAULT);
-    }
-
-    @Override
-    public String getOperation() {
-        return operation.toString();
-    }
-
-    public enum Operation {
-        CLAMP, MAD_HI, MAD_SAT, MAD24
-    }
-
-    public Operation operation() {
-        return operation;
     }
 
     public static ValueNode create(ValueNode x, ValueNode y, ValueNode z, Operation op, JavaKind kind) {
@@ -102,6 +81,39 @@ public class OCLIntTernaryIntrinsicNode extends TernaryNode implements Arithmeti
             }
         }
         return result;
+    }
+
+    private static long doCompute(long x, long y, long z, Operation op) {
+        switch (op) {
+            case CLAMP:
+                return TornadoMath.clamp(x, y, z);
+            default:
+                throw new TornadoInternalError("unknown op %s", op);
+        }
+    }
+
+    private static int doCompute(int x, int y, int z, Operation op) {
+        switch (op) {
+            case CLAMP:
+                return TornadoMath.clamp(x, y, z);
+
+            default:
+                throw new TornadoInternalError("unknown op %s", op);
+        }
+    }
+
+    @Override
+    public Stamp foldStamp(Stamp stampX, Stamp stampY, Stamp stampZ) {
+        return stamp(NodeView.DEFAULT);
+    }
+
+    @Override
+    public String getOperation() {
+        return operation.toString();
+    }
+
+    public Operation operation() {
+        return operation;
     }
 
     @Override
@@ -135,25 +147,6 @@ public class OCLIntTernaryIntrinsicNode extends TernaryNode implements Arithmeti
 
     }
 
-    private static long doCompute(long x, long y, long z, Operation op) {
-        switch (op) {
-            case CLAMP:
-                return TornadoMath.clamp(x, y, z);
-            default:
-                throw new TornadoInternalError("unknown op %s", op);
-        }
-    }
-
-    private static int doCompute(int x, int y, int z, Operation op) {
-        switch (op) {
-            case CLAMP:
-                return TornadoMath.clamp(x, y, z);
-
-            default:
-                throw new TornadoInternalError("unknown op %s", op);
-        }
-    }
-
     @Override
     public Node canonical(CanonicalizerTool tool, ValueNode x, ValueNode y, ValueNode z) {
         ValueNode c = tryConstantFold(x, y, z, operation(), getStackKind());
@@ -161,6 +154,10 @@ public class OCLIntTernaryIntrinsicNode extends TernaryNode implements Arithmeti
             return c;
         }
         return this;
+    }
+
+    public enum Operation {
+        CLAMP, MAD_HI, MAD_SAT, MAD24
     }
 
 }

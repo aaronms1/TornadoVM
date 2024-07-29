@@ -1,5 +1,5 @@
 /*
- * This file is part of Tornado: A heterogeneous programming framework: 
+ * This file is part of Tornado: A heterogeneous programming framework:
  * https://github.com/beehive-lab/tornadovm
  *
  * Copyright (c) 2013-2020, APT Group, Department of Computer Science,
@@ -12,7 +12,7 @@
  *
  * This code is distributed in the hope that it will be useful, but WITHOUT
  * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
- * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License
  * version 2 for more details (a copy is included in the LICENSE file that
  * accompanied this code).
  *
@@ -20,12 +20,8 @@
  * 2 along with this work; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
  *
- * Authors: James Clarkson
- *
  */
 package uk.ac.manchester.tornado.drivers.opencl.mm;
-
-import static uk.ac.manchester.tornado.runtime.common.Tornado.fatal;
 
 import java.lang.reflect.Array;
 import java.util.function.Function;
@@ -34,6 +30,7 @@ import jdk.vm.ci.meta.JavaKind;
 import uk.ac.manchester.tornado.api.exceptions.TornadoMemoryException;
 import uk.ac.manchester.tornado.api.exceptions.TornadoOutOfMemoryException;
 import uk.ac.manchester.tornado.drivers.opencl.OCLDeviceContext;
+import uk.ac.manchester.tornado.runtime.common.TornadoLogger;
 
 public class OCLMultiDimArrayWrapper<T, E> extends OCLArrayWrapper<T> {
 
@@ -85,26 +82,26 @@ public class OCLMultiDimArrayWrapper<T, E> extends OCLArrayWrapper<T> {
                 addresses[i] = wrappers[i].toBuffer();
             }
         } catch (TornadoOutOfMemoryException | TornadoMemoryException e) {
-            fatal("OOM: multi-dim array: %s", e.getMessage());
+            new TornadoLogger().fatal("OOM: multi-dim array: %s", e.getMessage());
             System.exit(-1);
         }
     }
 
-    private int writeElements(T values) {
+    private int writeElements(long executionPlanId, T values) {
         final E[] elements = innerCast(values);
         for (int i = 0; i < elements.length; i++) {
-            wrappers[i].enqueueWrite(elements[i], 0, 0, null, false);
+            wrappers[i].enqueueWrite(executionPlanId, elements[i], 0, 0, null, false);
         }
-        return deviceContext.enqueueBarrier();
+        return deviceContext.enqueueBarrier(executionPlanId);
     }
 
-    private int readElements(T values) {
+    private int readElements(long executionPlanId, T values) {
         final E[] elements = innerCast(values);
         // XXX: Offset is 0
         for (int i = 0; i < elements.length; i++) {
-            wrappers[i].enqueueRead(elements[i], 0, null, false);
+            wrappers[i].enqueueRead(executionPlanId, elements[i], 0, null, false);
         }
-        return deviceContext.enqueueBarrier();
+        return deviceContext.enqueueBarrier(executionPlanId);
     }
 
     @SuppressWarnings("unchecked")
@@ -113,31 +110,31 @@ public class OCLMultiDimArrayWrapper<T, E> extends OCLArrayWrapper<T> {
     }
 
     @Override
-    protected int enqueueReadArrayData(long bufferId, long offset, long bytes, T value, long hostOffset, int[] waitEvents) {
-        return readElements(value);
+    protected int enqueueReadArrayData(long executionPlanId, long bufferId, long offset, long bytes, T value, long hostOffset, int[] waitEvents) {
+        return readElements(executionPlanId, value);
     }
 
     @Override
-    protected int enqueueWriteArrayData(long bufferId, long offset, long bytes, T value, long hostOffset, int[] waitEvents) {
+    protected int enqueueWriteArrayData(long executionPlanId, long bufferId, long offset, long bytes, T value, long hostOffset, int[] waitEvents) {
         if (hostOffset > 0) {
             System.out.println("[WARNING] writing in offset 0");
         }
-        tableWrapper.enqueueWrite(addresses, 0, 0, null, false);
-        return writeElements(value);
+        tableWrapper.enqueueWrite(executionPlanId, addresses, 0, 0, null, false);
+        return writeElements(executionPlanId, value);
     }
 
     @Override
-    protected int readArrayData(long bufferId, long offset, long bytes, T value, long hostOffset, int[] waitEvents) {
-        return readElements(value);
+    protected int readArrayData(long executionPlanId, long bufferId, long offset, long bytes, T value, long hostOffset, int[] waitEvents) {
+        return readElements(executionPlanId, value);
     }
 
     @Override
-    protected void writeArrayData(long bufferId, long offset, long bytes, T value, long hostOffset, int[] waitEvents) {
+    protected void writeArrayData(long executionPlanId, long bufferId, long offset, long bytes, T value, long hostOffset, int[] waitEvents) {
         if (hostOffset > 0) {
             System.out.println("[WARNING] writing in offset 0");
         }
-        tableWrapper.enqueueWrite(addresses, 0, 0, null, false);
-        writeElements(value);
+        tableWrapper.enqueueWrite(executionPlanId, addresses, 0, 0, null, false);
+        writeElements(executionPlanId, value);
     }
 
 }

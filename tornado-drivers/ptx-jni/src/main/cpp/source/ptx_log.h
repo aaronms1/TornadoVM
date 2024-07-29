@@ -1,7 +1,7 @@
 /*
  * MIT License
  *
- * Copyright (c) 2020-2022, APT Group, Department of Computer Science,
+ * Copyright (c) 2020-2022, 2024, APT Group, Department of Computer Science,
  * The University of Manchester.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -35,9 +35,21 @@
         << std::endl;                                           \
     }                                                           \
     if (result != CUDA_SUCCESS)  {                              \
-        std::cout << "[TornadoVM-PTX-JNI] ERROR : " << name     \
+        std::cout << "\t[TornadoVM-PTX-JNI] ERROR : " << name   \
         << " -> Returned: " << result                           \
         << std::endl;                                           \
     }
 
+
+#define LOG_NVML_AND_VALIDATE(name, result)                         \
+    if (LOG_PTX == 1)  {                                            \
+        std::cout << "[TornadoVM-PTX-NVML-JNI] Calling : " << name  \
+        << " -> Status: " << result                                 \
+        << std::endl;                                               \
+    }                                                               \
+    if (result != NVML_SUCCESS)  {                                  \
+        std::cout << "[TornadoVM-PTX-NVML-JNI] ERROR : " << name    \
+        << " -> Returned: " << result                               \
+        << std::endl;                                               \
+    }
 #endif

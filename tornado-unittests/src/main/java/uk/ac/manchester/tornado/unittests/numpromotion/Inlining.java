@@ -6,7 +6,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *    http://www.apache.org/licenses/LICENSE-2.0
+ * http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -28,6 +28,9 @@ import uk.ac.manchester.tornado.api.TaskGraph;
 import uk.ac.manchester.tornado.api.TornadoExecutionPlan;
 import uk.ac.manchester.tornado.api.annotations.Parallel;
 import uk.ac.manchester.tornado.api.enums.DataTransferMode;
+import uk.ac.manchester.tornado.api.exceptions.TornadoExecutionPlanException;
+import uk.ac.manchester.tornado.api.types.arrays.ByteArray;
+import uk.ac.manchester.tornado.api.types.arrays.IntArray;
 import uk.ac.manchester.tornado.unittests.common.TornadoNotSupported;
 import uk.ac.manchester.tornado.unittests.common.TornadoTestBase;
 
@@ -36,39 +39,21 @@ import uk.ac.manchester.tornado.unittests.common.TornadoTestBase;
  * How to run?
  * </p>
  * <code>
- *     tornado-test -V uk.ac.manchester.tornado.unittests.numpromotion.Inlining
+ * tornado-test -V uk.ac.manchester.tornado.unittests.numpromotion.Inlining
  * </code>
  */
 public class Inlining extends TornadoTestBase {
 
-    public static void bitwiseOr(byte[] result, byte[] input, byte[] elements) {
-        result[0] |= input[1];
-    }
-
-    @Test
-    public void test0() {
-
-        byte[] elements = new byte[] { 4 };
-        byte[] result = new byte[4];
-        byte[] input = new byte[] { 127, 127, 127, 127, 1, 1, 1, 1 };
-
-        TaskGraph taskGraph = new TaskGraph("s0") //
-                .transferToDevice(DataTransferMode.EVERY_EXECUTION, result, input, elements) //
-                .task("t0", Inlining::bitwiseOr, result, input, elements) //
-                .transferToHost(DataTransferMode.EVERY_EXECUTION, result);
-
-        ImmutableTaskGraph immutableTaskGraph = taskGraph.snapshot();
-        TornadoExecutionPlan executionPlan = new TornadoExecutionPlan(immutableTaskGraph);
-        executionPlan.execute();
-
+    public static void bitwiseOr(ByteArray result, ByteArray input, ByteArray elements) {
+        result.set(0, (byte) (result.get(0) | input.get(1)));
     }
 
     public static int b2i(byte v) {
         return (v < 0) ? (255 + v) : v;
     }
 
-    public static void b2i(byte[] v, int[] result) {
-        result[0] = (v[0] < 0) ? (255 + v[0]) : v[0];
+    public static void b2i(ByteArray v, IntArray result) {
+        result.set(0, (v.get(0) < 0) ? (255 + v.get(0)) : v.get(0));
     }
 
     public static int grey(byte r, byte g, byte b) {
@@ -83,42 +68,62 @@ public class Inlining extends TornadoTestBase {
         return (29 * b2i((byte) r) + 60 * b2i((byte) g) + 11 * b2i((byte) b)) / 100;
     }
 
-    public static void rgbToGreyKernel(byte[] rgbBytes, int[] greyInts) {
-        for (@Parallel int i = 0; i < greyInts.length; i++) {
-            byte r = rgbBytes[i * 3];
-            byte g = rgbBytes[i * 3 + 1];
-            byte b = rgbBytes[i * 3 + 2];
-            greyInts[i] = grey(r, g, b);
+    public static void rgbToGreyKernel(ByteArray rgbBytes, IntArray greyInts) {
+        for (@Parallel int i = 0; i < greyInts.getSize(); i++) {
+            byte r = rgbBytes.get(i * 3);
+            byte g = rgbBytes.get(i * 3 + 1);
+            byte b = rgbBytes.get(i * 3 + 2);
+            greyInts.set(i, grey(r, g, b));
         }
     }
 
-    public static void rgbToGreyKernelInt(int[] rgbBytes, int[] greyInts) {
-        for (@Parallel int i = 0; i < greyInts.length; i++) {
-            int r = rgbBytes[i * 3];
-            int g = rgbBytes[i * 3 + 1];
-            int b = rgbBytes[i * 3 + 2];
-            greyInts[i] = grey(r, g, b);
+    public static void rgbToGreyKernelInt(IntArray rgbBytes, IntArray greyInts) {
+        for (@Parallel int i = 0; i < greyInts.getSize(); i++) {
+            int r = rgbBytes.get(i * 3);
+            int g = rgbBytes.get(i * 3 + 1);
+            int b = rgbBytes.get(i * 3 + 2);
+            greyInts.set(i, grey(r, g, b));
         }
     }
 
-    public static void rgbToGreyKernelSmall(byte[] rgbBytes, int[] greyInts) {
-        for (@Parallel int i = 0; i < greyInts.length; i++) {
-            byte r = rgbBytes[i];
-            greyInts[i] = grey(r);
+    public static void rgbToGreyKernelSmall(ByteArray rgbBytes, IntArray greyInts) {
+        for (@Parallel int i = 0; i < greyInts.getSize(); i++) {
+            byte r = rgbBytes.get(i);
+            greyInts.set(i, grey(r));
         }
+    }
+
+    @Test
+    public void test0() throws TornadoExecutionPlanException {
+
+        ByteArray elements = new ByteArray(1);
+        elements.init((byte) 4);
+        ByteArray result = new ByteArray(4);
+        ByteArray input = ByteArray.fromElements((byte) 127, (byte) 127, (byte) 127, (byte) 127, (byte) 1, (byte) 1, (byte) 1, (byte) 1);
+
+        TaskGraph taskGraph = new TaskGraph("s0") //
+                .transferToDevice(DataTransferMode.EVERY_EXECUTION, result, input, elements) //
+                .task("t0", Inlining::bitwiseOr, result, input, elements) //
+                .transferToHost(DataTransferMode.EVERY_EXECUTION, result);
+
+        ImmutableTaskGraph immutableTaskGraph = taskGraph.snapshot();
+        try (TornadoExecutionPlan executionPlan = new TornadoExecutionPlan(immutableTaskGraph)) {
+            executionPlan.execute();
+        }
+
     }
 
     @TornadoNotSupported
-    public void rgbToGreyKernel() {
+    public void rgbToGreyKernel() throws TornadoExecutionPlanException {
 
         final int size = 256;
-        byte[] rgbBytes = new byte[size * 3];
-        int[] greyInts = new int[size];
-        int[] seq = new int[size];
+        ByteArray rgbBytes = new ByteArray(size * 3);
+        IntArray greyInts = new IntArray(size);
+        IntArray seq = new IntArray(size);
 
         Random r = new Random();
-        IntStream.range(0, rgbBytes.length).forEach(i -> {
-            rgbBytes[i] = (byte) r.nextInt();
+        IntStream.range(0, rgbBytes.getSize()).forEach(i -> {
+            rgbBytes.set(i, (byte) r.nextInt());
         });
 
         TaskGraph taskGraph = new TaskGraph("foo");
@@ -127,25 +132,26 @@ public class Inlining extends TornadoTestBase {
                 .transferToHost(DataTransferMode.EVERY_EXECUTION, greyInts);
 
         ImmutableTaskGraph immutableTaskGraph = taskGraph.snapshot();
-        TornadoExecutionPlan executionPlan = new TornadoExecutionPlan(immutableTaskGraph);
-        executionPlan.execute();
+        try (TornadoExecutionPlan executionPlan = new TornadoExecutionPlan(immutableTaskGraph)) {
+            executionPlan.execute();
+        }
 
         rgbToGreyKernel(rgbBytes, seq);
 
-        for (int i = 0; i < seq.length; i++) {
-            Assert.assertEquals(seq[i], greyInts[i]);
+        for (int i = 0; i < seq.getSize(); i++) {
+            Assert.assertEquals(seq.get(i), greyInts.get(i));
         }
 
     }
 
     @Test
-    public void rgbToGreyKernelInt() {
+    public void rgbToGreyKernelInt() throws TornadoExecutionPlanException {
         final int size = 256;
-        int[] rgbBytes = new int[size * 3];
-        int[] greyInts = new int[size];
-        int[] seq = new int[size];
-        IntStream.range(0, rgbBytes.length).forEach(i -> {
-            rgbBytes[i] = 1;
+        IntArray rgbBytes = new IntArray(size * 3);
+        IntArray greyInts = new IntArray(size);
+        IntArray seq = new IntArray(size);
+        IntStream.range(0, rgbBytes.getSize()).forEach(i -> {
+            rgbBytes.set(i, 1);
         });
 
         TaskGraph taskGraph = new TaskGraph("foo");
@@ -154,26 +160,27 @@ public class Inlining extends TornadoTestBase {
                 .transferToHost(DataTransferMode.EVERY_EXECUTION, greyInts);
 
         ImmutableTaskGraph immutableTaskGraph = taskGraph.snapshot();
-        TornadoExecutionPlan executionPlan = new TornadoExecutionPlan(immutableTaskGraph);
-        executionPlan.execute();
+        try (TornadoExecutionPlan executionPlan = new TornadoExecutionPlan(immutableTaskGraph)) {
+            executionPlan.execute();
+        }
 
         rgbToGreyKernelInt(rgbBytes, seq);
 
-        for (int i = 0; i < seq.length; i++) {
-            Assert.assertEquals(seq[i], greyInts[i]);
+        for (int i = 0; i < seq.getSize(); i++) {
+            Assert.assertEquals(seq.get(i), greyInts.get(i));
         }
 
     }
 
     @TornadoNotSupported
-    public void rgbToGreyKernelSmall() {
+    public void rgbToGreyKernelSmall() throws TornadoExecutionPlanException {
         final int size = 256;
-        byte[] rgbBytes = new byte[size];
-        int[] greyInts = new int[size];
-        int[] seq = new int[size];
+        ByteArray rgbBytes = new ByteArray(size);
+        IntArray greyInts = new IntArray(size);
+        IntArray seq = new IntArray(size);
         Random r = new Random();
-        IntStream.range(0, rgbBytes.length).forEach(i -> {
-            rgbBytes[i] = (byte) -10;
+        IntStream.range(0, rgbBytes.getSize()).forEach(i -> {
+            rgbBytes.set(i, (byte) -10);
         });
 
         TaskGraph taskGraph = new TaskGraph("s0");
@@ -182,23 +189,24 @@ public class Inlining extends TornadoTestBase {
                 .transferToHost(DataTransferMode.EVERY_EXECUTION, greyInts);
 
         ImmutableTaskGraph immutableTaskGraph = taskGraph.snapshot();
-        TornadoExecutionPlan executionPlan = new TornadoExecutionPlan(immutableTaskGraph);
-        executionPlan.execute();
+        try (TornadoExecutionPlan executionPlan = new TornadoExecutionPlan(immutableTaskGraph)) {
+            executionPlan.execute();
+        }
 
         rgbToGreyKernelSmall(rgbBytes, seq);
 
-        for (int i = 0; i < seq.length; i++) {
-            Assert.assertEquals(seq[i], greyInts[i]);
+        for (int i = 0; i < seq.getSize(); i++) {
+            Assert.assertEquals(seq.get(i), greyInts.get(i));
         }
     }
 
     @TornadoNotSupported
-    public void b2i() {
-        byte[] rgbBytes = new byte[1];
-        int[] greyInts = new int[1];
-        int[] seq = new int[1];
-        IntStream.range(0, rgbBytes.length).forEach(i -> {
-            rgbBytes[i] = (byte) -10;
+    public void b2i() throws TornadoExecutionPlanException {
+        ByteArray rgbBytes = new ByteArray(1);
+        IntArray greyInts = new IntArray(1);
+        IntArray seq = new IntArray(1);
+        IntStream.range(0, rgbBytes.getSize()).forEach(i -> {
+            rgbBytes.set(i, (byte) -10);
         });
 
         TaskGraph taskGraph = new TaskGraph("s0");
@@ -207,13 +215,14 @@ public class Inlining extends TornadoTestBase {
                 .transferToHost(DataTransferMode.EVERY_EXECUTION, greyInts);
 
         ImmutableTaskGraph immutableTaskGraph = taskGraph.snapshot();
-        TornadoExecutionPlan executionPlan = new TornadoExecutionPlan(immutableTaskGraph);
-        executionPlan.execute();
+        try (TornadoExecutionPlan executionPlan = new TornadoExecutionPlan(immutableTaskGraph)) {
+            executionPlan.execute();
+        }
 
         b2i(rgbBytes, seq);
 
-        for (int i = 0; i < seq.length; i++) {
-            Assert.assertEquals(seq[i], greyInts[i]);
+        for (int i = 0; i < seq.getSize(); i++) {
+            Assert.assertEquals(seq.get(i), greyInts.get(i));
         }
     }
 }

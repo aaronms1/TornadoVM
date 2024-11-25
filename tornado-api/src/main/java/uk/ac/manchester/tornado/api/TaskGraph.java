@@ -41,6 +41,7 @@ import uk.ac.manchester.tornado.api.common.TornadoFunctions.Task7;
 import uk.ac.manchester.tornado.api.common.TornadoFunctions.Task8;
 import uk.ac.manchester.tornado.api.common.TornadoFunctions.Task9;
 import uk.ac.manchester.tornado.api.enums.ProfilerMode;
+import uk.ac.manchester.tornado.api.enums.TornadoVMBackendType;
 import uk.ac.manchester.tornado.api.exceptions.TornadoTaskRuntimeException;
 import uk.ac.manchester.tornado.api.runtime.ExecutorFrame;
 import uk.ac.manchester.tornado.api.runtime.TornadoAPIProvider;
@@ -758,8 +759,8 @@ public class TaskGraph implements TaskGraphInterface {
         taskGraphImpl.execute(executionPackage).waitOn();
     }
 
-    void warmup() {
-        taskGraphImpl.warmup();
+    void warmup(ExecutorFrame executionPackage) {
+        taskGraphImpl.warmup(executionPackage);
     }
 
     void dumpProfiles() {
@@ -861,10 +862,6 @@ public class TaskGraph implements TaskGraphInterface {
         taskGraphImpl.enableProfiler(profilerMode);
     }
 
-    void disableProfiler(ProfilerMode profilerMode) {
-        taskGraphImpl.disableProfiler(profilerMode);
-    }
-
     void withConcurrentDevices() {
         taskGraphImpl.withConcurrentDevices();
     }
@@ -887,6 +884,10 @@ public class TaskGraph implements TaskGraphInterface {
 
     void withoutPrintKernel() {
         taskGraphImpl.withoutPrintKernel();
+    }
+
+    void withCompilerFlags(TornadoVMBackendType backendType, String compilerFlags) {
+        taskGraphImpl.withCompilerFlags(backendType, compilerFlags);
     }
 
     void withGridScheduler(GridScheduler gridScheduler) {

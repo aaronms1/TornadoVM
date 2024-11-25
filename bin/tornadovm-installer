@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 #
-# Copyright (c) 2013-2023, APT Group, Department of Computer Science,
+# Copyright (c) 2013-2024, APT Group, Department of Computer Science,
 # The University of Manchester.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -32,8 +32,11 @@ tornadoReq.check_python_dependencies()
 import wget
 import installer_config as config
 
+## ################################################################
+## Configuration
+## ################################################################
 __DIRECTORY_DEPENDENCIES__ = os.path.join("etc", "dependencies")
-__VERSION__ = "v1.0.5"
+__VERSION__ = "v1.0.7-dev"
 
 __SUPPORTED_JDKS__ = [
     config.__JDK21__,
@@ -47,11 +50,13 @@ __SUPPORTED_JDKS__ = [
 ]
 
 __SUPPORTED_BACKENDS__ = ["opencl", "spirv", "ptx"]
-
+## ################################################################
 
 class TornadoInstaller:
+
     def __init__(self):
         self.workDirName = ""
+        self.dependenciesDirName = ""
         self.osPlatform = self.getOSPlatform()
         self.hardware = self.getMachineArc()
         self.env = {}
@@ -80,6 +85,11 @@ class TornadoInstaller:
         if not os.path.exists(self.workDirName):
             os.makedirs(self.workDirName)
 
+    def setDependenciesDir(self):
+        self.dependenciesDirName = os.path.join(__DIRECTORY_DEPENDENCIES__)
+        if not os.path.exists(self.dependenciesDirName):
+            os.makedirs(self.dependenciesDirName)
+
     def getCurrentDirectory(self):
         return os.getcwd()
 
@@ -91,7 +101,7 @@ class TornadoInstaller:
 
         fileName = self.processFileName(url)
         print("\nChecking dependency: " + fileName)
-        fullPath = os.path.join(self.workDirName, fileName)
+        fullPath = os.path.join(self.dependenciesDirName, fileName)
 
         if not os.path.exists(fullPath):
             wget.download(url, fullPath)
@@ -100,14 +110,14 @@ class TornadoInstaller:
         try:
             if os.name == 'nt':
                 ar = zipfile.ZipFile(fullPath, 'r')
-                cmakeTLD = os.path.join(self.getCurrentDirectory(), self.workDirName, self.getTLDName(ar))
+                cmakeTLD = os.path.join(self.getCurrentDirectory(), self.dependenciesDirName, self.getTLDName(ar))
                 if not os.path.exists(cmakeTLD):
-                    ar.extractall(self.workDirName)
+                    ar.extractall(self.dependenciesDirName)
             else:
                 ar = tarfile.open(fullPath, "r:gz")
-                cmakeTLD = os.path.join(self.getCurrentDirectory(), self.workDirName, self.getTLDName(ar))
+                cmakeTLD = os.path.join(self.getCurrentDirectory(), self.dependenciesDirName, self.getTLDName(ar))
                 if not os.path.exists(cmakeTLD):
-                    ar.extractall(self.workDirName, numeric_owner=True)
+                    ar.extractall(self.dependenciesDirName, numeric_owner=True)
         except:
             print(f"Unpacking failed for CMake {url}")
             sys.exit(0)
@@ -130,7 +140,7 @@ class TornadoInstaller:
 
         fileName = self.processFileName(url)
         print("\nChecking dependency: " + fileName)
-        fullPath = os.path.join(self.workDirName, fileName)
+        fullPath = os.path.join(self.dependenciesDirName, fileName)
 
         if not os.path.exists(fullPath):
             wget.download(url, fullPath)
@@ -139,14 +149,14 @@ class TornadoInstaller:
         try:
             if os.name == 'nt':
                 ar = zipfile.ZipFile(fullPath, 'r')
-                mavenTLD = os.path.join(self.getCurrentDirectory(), self.workDirName, self.getTLDName(ar))
+                mavenTLD = os.path.join(self.getCurrentDirectory(), self.dependenciesDirName, self.getTLDName(ar))
                 if not os.path.exists(mavenTLD):
-                    ar.extractall(self.workDirName)
+                    ar.extractall(self.dependenciesDirName)
             else:
                 ar = tarfile.open(fullPath, "r:gz")
-                mavenTLD = os.path.join(self.getCurrentDirectory(), self.workDirName, self.getTLDName(ar))
+                mavenTLD = os.path.join(self.getCurrentDirectory(), self.dependenciesDirName, self.getTLDName(ar))
                 if not os.path.exists(mavenTLD):
-                    ar.extractall(self.workDirName, numeric_owner=True)
+                    ar.extractall(self.dependenciesDirName, numeric_owner=True)
         except:
             print(f"Unpacking failed for Maven {url}")
             sys.exit(0)
@@ -155,6 +165,7 @@ class TornadoInstaller:
 
         ## Update env-variables
         self.env["PATH"].append(os.path.join(mavenTLD, "bin"))
+
 
     def getTLDName(self, ar):
         if os.name == 'nt':
@@ -299,19 +310,16 @@ class TornadoInstaller:
         backend = "BACKEND=" + backend
         return backend
 
-
     def composePolyglotOption(self, args):
         if args.polyglot:
             polyglotOption = "polyglot"
         else:
             polyglotOption = ""
         return polyglotOption
-    
 
     def check_or_install_python_modules(self):
         command = "pip3 install -r bin/tornadoDepModules.txt"
         os.system(command)
-
 
     def install(self, args):
 
@@ -337,6 +345,7 @@ class TornadoInstaller:
         else:
             directoryPostfix = args.jdk
 
+        self.setDependenciesDir()
         self.setWorkDir(directoryPostfix)
 
         self.downloadCMake()

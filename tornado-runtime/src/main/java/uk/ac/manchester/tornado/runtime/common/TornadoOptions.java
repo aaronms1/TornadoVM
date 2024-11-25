@@ -33,6 +33,21 @@ public class TornadoOptions {
     private static final String TRUE = "TRUE";
 
     /**
+     * Default OpenCL Compiler Flags.
+     */
+    public static final String DEFAULT_OPENCL_COMPILER_FLAGS = getProperty("tornado.opencl.compiler.flags", "-cl-mad-enable -cl-fast-relaxed-math -w");
+
+    /**
+     * Default PTX Compiler Flags.
+     */
+    public static final String DEFAULT_PTX_COMPILER_FLAGS = getProperty("tornado.ptx.compiler.flags", "");
+
+    /**
+     * Default SPIR-V/LevelZero Flags.
+     */
+    public static final String DEFAULT_SPIRV_LEVEL_ZERO_COMPILER_FLAGS = getProperty("tornado.spirv.levelzero.flags", "-ze-opt-level 2 -ze-opt-large-register-file");
+
+    /**
      * Use internal timers for profiling in ns if enabled, in ms if disabled. Default is ns (enabled).
      */
     public static final boolean TIME_IN_NANOSECONDS = Boolean.parseBoolean(System.getProperty("tornado.ns.time", TRUE));
@@ -114,6 +129,13 @@ public class TornadoOptions {
      * Enable/Disable FMA Optimizations. True by default.
      */
     public static final boolean ENABLE_FMA = getBooleanValue("tornado.enable.fma", TRUE);
+
+    /**
+     * Enable/Disable Loop Unroll SPIR-V instruction: True by default.
+     *
+     * <p>This flag only applies for the SPIR-V Backend</p>
+     */
+    public static final boolean ENABLE_SPIRV_LOOP_UNROLL = getBooleanValue("tornado.spirv.loopunroll", TRUE);
     /**
      * Enable/Disable Fix Reads Optimization. True by default.
      */
@@ -217,6 +239,11 @@ public class TornadoOptions {
      * generated SPIRV kernel.
      */
     public static final boolean SPIRV_DIRECT_CALL_WITH_LOAD_HEAP = getBooleanValue("tornado.spirv.directcall.heap", FALSE);
+
+    /**
+     * Set the SPIR-V Version Supported. It is set to 1.2 by default.
+     */
+    public static final float SPIRV_VERSION_SUPPORTED = getFloatValue("tornado.spirv.version", "1.2");
     /**
      * Trace code generation.
      */
@@ -323,9 +350,9 @@ public class TornadoOptions {
     }
 
     /**
-     * Set Loop unrolling factor for the FPGA compilation. Default is set to 2.
+     * Set Loop unrolling factor. Default is set to 4.
      */
-    public static final int UNROLL_FACTOR = Integer.parseInt(getProperty("tornado.unroll.factor", "2"));
+    public static final int UNROLL_FACTOR = Integer.parseInt(getProperty("tornado.unroll.factor", "4"));
 
     /**
      * Enable basic debug information. Disabled by default.
@@ -403,6 +430,10 @@ public class TornadoOptions {
 
     private static int getIntValue(String property, String defaultValue) {
         return Integer.parseInt(System.getProperty(property, defaultValue));
+    }
+
+    private static float getFloatValue(String property, String defaultValue) {
+        return Float.parseFloat(System.getProperty(property, defaultValue));
     }
 
     private static boolean isFPGAEmulation() {

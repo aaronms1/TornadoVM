@@ -17,7 +17,6 @@
  */
 package uk.ac.manchester.tornado.api;
 
-import uk.ac.manchester.tornado.api.TornadoExecutionPlan.TornadoExecutor;
 import uk.ac.manchester.tornado.api.enums.ProfilerMode;
 import uk.ac.manchester.tornado.api.profiler.ProfilerInterface;
 
@@ -37,14 +36,16 @@ import uk.ac.manchester.tornado.api.profiler.ProfilerInterface;
  * {@link TornadoExecutionPlan#withProfiler(ProfilerMode)}.
  * </p>
  *
- * @since TornadoVM-0.15
+ * @since 0.15
  */
 public class TornadoProfilerResult implements ProfilerInterface {
 
     private final TornadoExecutor executor;
+    private String traceExecutionPlan;
 
-    TornadoProfilerResult(TornadoExecutor executor) {
+    TornadoProfilerResult(TornadoExecutor executor, String traceExecutionPlan) {
         this.executor = executor;
+        this.traceExecutionPlan = traceExecutionPlan;
     }
 
     /**
@@ -225,6 +226,10 @@ public class TornadoProfilerResult implements ProfilerInterface {
     @Override
     public long getTotalDeviceMemoryUsage() {
         return executor.getTotalDeviceMemoryUsage();
+    }
+
+    public String getTraceExecutionPlan() {
+        return traceExecutionPlan;
     }
 
 }
